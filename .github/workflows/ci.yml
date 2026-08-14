@@ -73,9 +73,12 @@ jobs:
             echo "::error::.env nesmí být ve verzovacím systému"
             exit 1
           fi
-          # Only an env-file style assignment with a literal value is a leak;
-          # `${VAR}` interpolation and zod schema keys are legitimate.
-          if git grep -nIE '^[^#]*(JIRA_PASSWORD|JIRA_USERNAME)=[^$[:space:]"'"'"']' -- . ':!*.example'; then
+          # Only an env-file style assignment with a literal value is a leak; `${VAR}`
+          # interpolation, zod schema keys and the e2e mock credentials are legitimate.
+          creds=$(git grep -nIE '^[^#]*(JIRA_PASSWORD|JIRA_USERNAME)=[^$[:space:]"'"'"']' \
+                  -- . ':!*.example' ':!Makefile' ':!.github/*' ':!docker-compose.e2e.yml' || true)
+          if [ -n "$creds" ]; then
+            echo "$creds"
             echo "::error::vypadá to na natvrdo zapsané přihlašovací údaje"
             exit 1
           fi
