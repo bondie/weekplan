@@ -18,6 +18,8 @@ const patchSchema = z.object({
   workingDays: z.array(z.number().int().min(1).max(7)).optional(),
   showWeekend: z.boolean().optional(),
   jql: z.string().max(1000).nullable().optional(),
+  ignoredProjects: z.array(z.string().max(50)).optional(),
+  overheadProject: z.string().max(50).nullable().optional(),
 })
 
 export async function meRoutes(app: FastifyInstance) {
@@ -32,6 +34,8 @@ export async function meRoutes(app: FastifyInstance) {
       workingDays: user.workingDays,
       showWeekend: user.showWeekend,
       jql: user.jql,
+      ignoredProjects: user.ignoredProjects,
+      overheadProject: user.overheadProject,
       defaultJql: DEFAULT_JQL,
       effectiveJql: buildJql(user),
       timezone: user.timezone,
@@ -49,6 +53,8 @@ export async function meRoutes(app: FastifyInstance) {
         workingDays: body.workingDays,
         showWeekend: body.showWeekend,
         jql: body.jql === '' ? null : body.jql,
+        ignoredProjects: body.ignoredProjects,
+        overheadProject: body.overheadProject === '' ? null : body.overheadProject,
       },
     })
 
@@ -58,6 +64,8 @@ export async function meRoutes(app: FastifyInstance) {
       workingDays: updated.workingDays,
       showWeekend: updated.showWeekend,
       jql: updated.jql,
+      ignoredProjects: updated.ignoredProjects,
+      overheadProject: updated.overheadProject,
     }
   })
 
@@ -75,6 +83,8 @@ export async function meRoutes(app: FastifyInstance) {
         assigneeUsername: user.jiraUsername,
         isResolved: false,
         isOrphaned: false,
+        // Overhead is not deliverable work — counting it would skew "how much is left".
+        projectKey: { notIn: [...user.ignoredProjects, ...(user.overheadProject ? [user.overheadProject] : [])] },
         ...(hiddenIds.length > 0 ? { id: { notIn: hiddenIds } } : {}),
       },
       select: { remainingEstimateMin: true, originalEstimateMin: true, sprintId: true },

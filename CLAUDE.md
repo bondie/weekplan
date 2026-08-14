@@ -74,6 +74,11 @@ PAT tokeny přišly až v 8.14, takže heslo je jediná možnost. Konfigurace je
 - Hledání **ignoruje filtr sprintů**, aby nešel žádný task ztratit jen proto, že jeho sprint není
   zaškrtnutý.
 - Uživatel může jednotlivé tasky skrýt (`HiddenIssue`) — na staré nesmysly, které v JIRA visí roky.
+- `User.ignoredProjects` vyřazuje celé projekty (typicky ty, kam se nedá vykazovat). JIRA ukazuje
+  backlog **boardu**, aplikace se ptá napříč instancí — bez tohohle filtru se v backlogu objeví
+  i projekty, které uživatel na svém boardu nikdy nevidí.
+- `User.overheadProject` označuje projekt s režií (měsíčně rotující task). Jeho výkazy jsou ve dnech
+  odlišené a **nepočítají se do zbývající práce** — jinak by ji nafoukly o něco, co není dodávka.
 
 ## Worklogy (co bylo reálně odpracováno)
 

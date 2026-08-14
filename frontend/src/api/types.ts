@@ -59,6 +59,7 @@ export interface Day {
   overbookedMinutes: number
   blockedAllDay: boolean
   loggedMinutes: number
+  loggedOverheadMinutes: number
   override: { capacityMinutes: number; note: string | null } | null
   events: CalendarEventItem[]
   assignments: Assignment[]
@@ -115,6 +116,8 @@ export interface Me {
   workingDays: number[]
   showWeekend: boolean
   jql: string | null
+  ignoredProjects: string[]
+  overheadProject: string | null
   defaultJql: string
   effectiveJql: string
   timezone: string
@@ -151,6 +154,7 @@ export interface WorklogItem {
   minutes: number
   comment: string | null
   role: string | null
+  isOverhead: boolean
 }
 
 export interface SyncStatus {

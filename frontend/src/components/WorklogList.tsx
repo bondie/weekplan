@@ -8,6 +8,7 @@ interface Group {
   issueKey: string
   issueSummary: string
   minutes: number
+  isOverhead: boolean
   entries: WorklogItem[]
 }
 
@@ -21,6 +22,7 @@ function groupByIssue(worklogs: WorklogItem[]): Group[] {
         issueKey: worklog.issueKey,
         issueSummary: worklog.issueSummary,
         minutes: worklog.minutes,
+        isOverhead: worklog.isOverhead,
         entries: [worklog],
       })
       continue
@@ -58,11 +60,19 @@ export default function WorklogList({ worklogs }: { worklogs: WorklogItem[] }) {
         {shown.map((group) => (
           <li key={group.issueKey}>
             <div className="flex items-baseline gap-1.5" title={group.issueSummary}>
-              <span className="font-mono text-[10px] font-semibold text-slate-500">{group.issueKey}</span>
+              <span
+                className={`font-mono text-[10px] font-semibold ${group.isOverhead ? 'text-amber-600' : 'text-slate-500'}`}
+              >
+                {group.isOverhead ? 'režie' : group.issueKey}
+              </span>
               {group.entries.length === 1 ? (
                 <span className="truncate text-[11px] text-slate-500">{label(group.entries[0])}</span>
               ) : null}
-              <span className="ml-auto shrink-0 text-[11px] font-medium text-emerald-700 tabular-nums">
+              <span
+                className={`ml-auto shrink-0 text-[11px] font-medium tabular-nums ${
+                  group.isOverhead ? 'text-amber-600' : 'text-emerald-700'
+                }`}
+              >
                 {formatMinutes(group.minutes)}
               </span>
             </div>

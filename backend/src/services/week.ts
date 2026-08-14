@@ -102,6 +102,7 @@ export interface WorklogPayload {
   minutes: number
   comment: string | null
   role: string | null
+  isOverhead: boolean
 }
 
 export interface DayPayload {
@@ -119,6 +120,7 @@ export interface DayPayload {
   overbookedMinutes: number
   blockedAllDay: boolean
   loggedMinutes: number
+  loggedOverheadMinutes: number
   override: { capacityMinutes: number; note: string | null } | null
   events: EventPayload[]
   assignments: AssignmentPayload[]
@@ -143,6 +145,11 @@ export interface WeekPayload {
   sprintsForWeek: SprintPayload[]
   activeSprints: SprintPayload[]
   nextSprint: SprintPayload | null
+}
+
+/** The overhead task rotates monthly, so it is matched by project, not by issue key. */
+function isOverheadIssue(user: User, issueKey: string): boolean {
+  return user.overheadProject !== null && issueKey.startsWith(`${user.overheadProject}-`)
 }
 
 function dayCapacity(user: User, key: DateKey, override: DayOverride | undefined, holiday: string | null): number {
@@ -224,6 +231,9 @@ function buildDay(
       .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.startsAt.localeCompare(b.startsAt)),
     assignments: assignments.map((item) => item.assignment).sort((a, b) => a.position - b.position),
     loggedMinutes: worklogs.reduce((sum, worklog) => sum + worklog.minutes, 0),
+    loggedOverheadMinutes: worklogs
+      .filter((worklog) => isOverheadIssue(user, worklog.issueKey))
+      .reduce((sum, worklog) => sum + worklog.minutes, 0),
     worklogs: worklogs
       .map((worklog) => ({
         id: worklog.id,
@@ -232,6 +242,7 @@ function buildDay(
         minutes: worklog.minutes,
         comment: worklog.comment,
         role: worklog.role,
+        isOverhead: isOverheadIssue(user, worklog.issueKey),
       }))
       .sort((a, b) => b.minutes - a.minutes),
   }

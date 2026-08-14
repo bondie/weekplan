@@ -18,8 +18,11 @@ const json = (body: unknown) => JSON.stringify(body)
 
 export const api = {
   me: () => request<Me>('/me'),
-  updateMe: (body: Partial<Pick<Me, 'dailyCapacityMinutes' | 'workingDays' | 'showWeekend' | 'jql'>>) =>
-    request<Me>('/me', { method: 'PATCH', body: json(body) }),
+  updateMe: (
+    body: Partial<
+      Pick<Me, 'dailyCapacityMinutes' | 'workingDays' | 'showWeekend' | 'jql' | 'ignoredProjects' | 'overheadProject'>
+    >,
+  ) => request<Me>('/me', { method: 'PATCH', body: json(body) }),
 
   week: (from: string) => request<Week>(`/week?from=${from}`),
 

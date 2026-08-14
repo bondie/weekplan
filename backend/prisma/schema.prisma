@@ -17,6 +17,8 @@ model User {
   workingDays          Int[]    @default([1, 2, 3, 4, 5]) // ISO weekday 1=Mon .. 7=Sun
   timezone             String   @default("Europe/Prague")
   jql                  String? // overrides the default query; {user} expands to jiraUsername
+  ignoredProjects      String[] @default([]) // project keys that never show up in planning
+  overheadProject      String? // project whose worklogs count as overhead (the monthly "režie" task)
   showWeekend          Boolean  @default(false)
   isActive             Boolean  @default(true)
   createdAt            DateTime @default(now())

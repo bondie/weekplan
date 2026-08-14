@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, RefreshCw, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { api } from '../api/client'
-import { formatRelative } from '../lib/format'
+import { formatRelative, todayKey } from '../lib/format'
 
 const WEEKDAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
@@ -10,6 +10,10 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient()
   const me = useQuery({ queryKey: ['me'], queryFn: api.me })
   const sources = useQuery({ queryKey: ['sources'], queryFn: api.sources })
+  const projects = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => (await api.issues(todayKey(), [], '', '')).projects,
+  })
 
   const [newSource, setNewSource] = useState({ name: 'Outlook / Teams', url: '' })
   const [jqlDraft, setJqlDraft] = useState<string | null>(null)
@@ -95,6 +99,62 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }) {
                 )
               })}
             </div>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Projekty</h3>
+            <p className="mb-2 text-xs text-slate-500">
+              Ignorované projekty se v plánování vůbec nezobrazují. Projekt s režií se nepočítá do zbývající práce a
+              jeho výkazy jsou ve dnech odlišené — měsíční režijní task se tak přepíná sám.
+            </p>
+
+            <div className="space-y-1">
+              {projects.data?.map((item) => {
+                const ignored = user?.ignoredProjects.includes(item.key) ?? false
+                const isOverhead = user?.overheadProject === item.key
+                return (
+                  <div key={item.key} className="flex items-center gap-3 rounded px-1 py-0.5 text-sm hover:bg-slate-50">
+                    <span className="font-mono text-xs text-slate-600">{item.key}</span>
+                    <span className="text-xs text-slate-400">{item.count}</span>
+
+                    <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={ignored}
+                        onChange={() => {
+                          if (!user) return
+                          updateMe.mutate({
+                            ignoredProjects: ignored
+                              ? user.ignoredProjects.filter((key) => key !== item.key)
+                              : [...user.ignoredProjects, item.key],
+                          })
+                        }}
+                      />
+                      ignorovat
+                    </label>
+
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-500">
+                      <input
+                        type="radio"
+                        name="overheadProject"
+                        checked={isOverhead}
+                        onChange={() => updateMe.mutate({ overheadProject: item.key })}
+                      />
+                      režie
+                    </label>
+                  </div>
+                )
+              })}
+            </div>
+
+            {user?.overheadProject ? (
+              <button
+                onClick={() => updateMe.mutate({ overheadProject: null })}
+                className="mt-2 text-xs text-slate-500 hover:text-indigo-600"
+              >
+                Zrušit projekt s režií ({user.overheadProject})
+              </button>
+            ) : null}
           </section>
 
           <section>

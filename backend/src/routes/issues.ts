@@ -47,6 +47,7 @@ export async function issuesRoutes(app: FastifyInstance) {
       assigneeUsername: user.jiraUsername,
       isResolved: false,
       isOrphaned: false,
+      ...(user.ignoredProjects.length > 0 ? { projectKey: { notIn: user.ignoredProjects } } : {}),
       ...(hidden ? { id: { in: hiddenIds } } : excluded.length > 0 ? { id: { notIn: excluded } } : {}),
     }
 
@@ -141,7 +142,12 @@ export async function issuesRoutes(app: FastifyInstance) {
       return (a.rank ?? '~').localeCompare(b.rank ?? '~')
     })
 
-    const projects = await prisma.issue.groupBy({ by: ['projectKey'], where: base, _count: { _all: true } })
+    // Ignored projects stay in this list so settings can offer them back.
+    const projects = await prisma.issue.groupBy({
+      by: ['projectKey'],
+      where: { assigneeUsername: user.jiraUsername, isResolved: false, isOrphaned: false },
+      _count: { _all: true },
+    })
 
     return {
       issues: ordered.map((issue) => serializeIssue(issue, plannedByIssue.get(issue.id) ?? 0)),
