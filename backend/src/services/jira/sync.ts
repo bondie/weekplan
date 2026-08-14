@@ -3,7 +3,7 @@ import { DEFAULT_JQL, env } from '../../env'
 import { addDaysToKey, keyToDbDate, todayKey } from '../../lib/dates'
 import { prisma } from '../../lib/prisma'
 import { JiraError, getIssue, getMyself, searchIssues, type JiraIssue } from './client'
-import { extractSprintIds, pickSprintId, resolveSprints } from './sprint'
+import { extractSprintIds, pickSprintId, resolveSprints, syncBoardSprints } from './sprint'
 
 const HOT_JQL =
   'assignee = "{user}" AND statusCategory != Done AND (sprint in openSprints() OR updated >= -7d) ORDER BY Rank ASC'
@@ -112,6 +112,7 @@ export async function syncPlanned(user: User): Promise<number> {
 export async function syncFull(user: User): Promise<number> {
   const startedAt = new Date()
   const count = await upsertIssues(await searchIssues(buildJql(user), 2000))
+  await syncBoardSprints()
 
   if (count > 0) {
     await prisma.issue.updateMany({

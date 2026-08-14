@@ -58,7 +58,7 @@ services:
     build: ./frontend
     environment:
       TZ: Europe/Prague
-      PROXY_PORT: ${PROXY_PORT:-8090}
+      PROXY_HTTPS_PORT: ${PROXY_HTTPS_PORT:-8443}
     ports:
       - '127.0.0.1:5180:5180'
     depends_on:
@@ -71,10 +71,15 @@ services:
 
   proxy:
     image: nginx:1.27-alpine
+    environment:
+      NGINX_ENVSUBST_FILTER: PUBLIC_
+      PUBLIC_HTTPS_SUFFIX: ${PROXY_HTTPS_SUFFIX-}
     ports:
       - '127.0.0.1:${PROXY_PORT:-8090}:80'
+      - '127.0.0.1:${PROXY_HTTPS_PORT:-8443}:443'
     volumes:
-      - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./proxy/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./proxy/certs:/etc/nginx/certs:ro
     depends_on:
       - web
       - api

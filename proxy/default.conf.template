@@ -1,6 +1,21 @@
 server {
     listen 80 default_server;
+    server_name _;
+
+    # Only PUBLIC_* placeholders are substituted (NGINX_ENVSUBST_FILTER), nginx
+    # variables below survive as-is.
+    return 301 https://$host${PUBLIC_HTTPS_SUFFIX}$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    http2 on;
     server_name weekplan.localhost localhost;
+
+    ssl_certificate /etc/nginx/certs/weekplan.localhost.pem;
+    ssl_certificate_key /etc/nginx/certs/weekplan.localhost-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:2m;
 
     client_max_body_size 8m;
 

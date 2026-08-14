@@ -1,4 +1,5 @@
 .env
+proxy/certs/
 node_modules/
 dist/
 coverage/

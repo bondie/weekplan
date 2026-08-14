@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma'
-import { getSprint } from './client'
+import { getBoardSprints, getSprint, type JiraSprint } from './client'
 
 /**
  * Jira Server returns customfield_10004 as a serialized java toString:
@@ -59,22 +59,7 @@ export async function resolveSprints(ids: number[]): Promise<Map<number, CachedS
   for (const id of ids) {
     if (result.has(id)) continue
     try {
-      const data = await getSprint(id)
-      const record = {
-        id: data.id,
-        name: data.name ?? `Sprint ${data.id}`,
-        state: (data.state ?? 'unknown').toUpperCase(),
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        endDate: data.endDate ? new Date(data.endDate) : null,
-        completeDate: data.completeDate ? new Date(data.completeDate) : null,
-        originBoardId: data.originBoardId ?? null,
-      }
-      await prisma.sprint.upsert({
-        where: { id: record.id },
-        create: { ...record, fetchedAt: new Date() },
-        update: { ...record, fetchedAt: new Date() },
-      })
-      result.set(id, record)
+      result.set(id, await storeSprint(await getSprint(id)))
     } catch {
       const stale = cached.find((s) => s.id === id)
       if (stale) result.set(id, stale)
@@ -82,6 +67,54 @@ export async function resolveSprints(ids: number[]): Promise<Map<number, CachedS
   }
 
   return result
+}
+
+function toRecord(data: JiraSprint): CachedSprint {
+  return {
+    id: data.id,
+    name: data.name ?? `Sprint ${data.id}`,
+    state: (data.state ?? 'unknown').toUpperCase(),
+    startDate: data.startDate ? new Date(data.startDate) : null,
+    endDate: data.endDate ? new Date(data.endDate) : null,
+    completeDate: data.completeDate ? new Date(data.completeDate) : null,
+    originBoardId: data.originBoardId ?? null,
+  }
+}
+
+async function storeSprint(data: JiraSprint): Promise<CachedSprint> {
+  const record = toRecord(data)
+  await prisma.sprint.upsert({
+    where: { id: record.id },
+    create: { ...record, fetchedAt: new Date() },
+    update: { ...record, fetchedAt: new Date() },
+  })
+  return record
+}
+
+/**
+ * Sprints an issue was never moved into are invisible to the issue sync, so the upcoming
+ * ones are pulled straight from the boards the known sprints come from.
+ */
+export async function syncBoardSprints(): Promise<number> {
+  const boards = await prisma.sprint.findMany({
+    where: { originBoardId: { not: null } },
+    distinct: ['originBoardId'],
+    select: { originBoardId: true },
+  })
+
+  let count = 0
+  for (const { originBoardId } of boards) {
+    try {
+      for (const sprint of await getBoardSprints(originBoardId!)) {
+        await storeSprint(sprint)
+        count += 1
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return count
 }
 
 /** An issue carried over from a previous sprint belongs to several: ACTIVE wins, then FUTURE, then newest CLOSED. */
@@ -92,9 +125,15 @@ export function pickSprintId(ids: number[], sprints: Map<number, CachedSprint>):
   known.sort((a, b) => {
     const stateDiff = (STATE_PRIORITY[a.state] ?? 3) - (STATE_PRIORITY[b.state] ?? 3)
     if (stateDiff !== 0) return stateDiff
-    const aStart = a.startDate?.getTime() ?? 0
-    const bStart = b.startDate?.getTime() ?? 0
-    return a.state === 'CLOSED' ? bStart - aStart : aStart - bStart
+
+    const aStart = a.startDate?.getTime()
+    const bStart = b.startDate?.getTime()
+    if (aStart != null && bStart != null && aStart !== bStart) {
+      return a.state === 'CLOSED' ? bStart - aStart : aStart - bStart
+    }
+
+    // Future sprints usually have no dates until they start, but their ids grow over time.
+    return a.state === 'CLOSED' ? b.id - a.id : a.id - b.id
   })
 
   return known[0].id

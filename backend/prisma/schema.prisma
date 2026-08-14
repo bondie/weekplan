@@ -26,6 +26,20 @@ model User {
   calendarSources CalendarSource[]
   calendarEvents  CalendarEvent[]
   dayOverrides    DayOverride[]
+  hiddenIssues    HiddenIssue[]
+}
+
+/// Issues the user never wants to see in the planning panel (stale, wrong project, noise).
+model HiddenIssue {
+  id        String   @id @default(cuid())
+  userId    String
+  issueId   String
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, issueId])
 }
 
 /// Read-only cache of JIRA issues; this app never writes to JIRA.
@@ -57,8 +71,9 @@ model Issue {
   syncedAt             DateTime  @default(now())
   isOrphaned           Boolean   @default(false) // dropped out of the sync query (reassigned, deleted)
 
-  sprint      Sprint?      @relation(fields: [sprintId], references: [id])
+  sprint      Sprint?       @relation(fields: [sprintId], references: [id])
   assignments Assignment[]
+  hiddenBy    HiddenIssue[]
 
   @@index([assigneeUsername, isResolved])
   @@index([sprintId])

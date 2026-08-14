@@ -63,6 +63,13 @@ export interface Day {
   assignments: Assignment[]
 }
 
+export interface Sprint {
+  id: number
+  name: string
+  startDate: string | null
+  endDate: string | null
+}
+
 export interface Week {
   weekStart: string
   weekEnd: string
@@ -78,14 +85,22 @@ export interface Week {
     freeMinutes: number
     overbookedMinutes: number
   }
-  activeSprints: Array<{ id: number; name: string; startDate: string | null; endDate: string | null }>
+  sprintsForWeek: Sprint[]
+  activeSprints: Sprint[]
+  nextSprint: Sprint | null
 }
 
-export type Scope = 'sprint' | 'future' | 'backlog' | 'all'
+export interface SprintOption extends Sprint {
+  state: string
+  count: number
+}
 
 export interface IssueList {
   issues: Issue[]
-  counts: Record<Scope, number>
+  sprints: SprintOption[]
+  noSprintCount: number
+  hiddenCount: number
+  selected: string[]
   projects: Array<{ key: string; count: number }>
 }
 

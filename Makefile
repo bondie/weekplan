@@ -1,13 +1,25 @@
 .PHONY: up down restart build logs logs-api logs-web sync sync-jira sync-calendar studio psql reset-db status shell-api
 
-PROXY_PORT ?= $(shell grep -E '^PROXY_PORT=' .env 2>/dev/null | cut -d= -f2)
-PROXY_PORT := $(if $(PROXY_PORT),$(PROXY_PORT),8090)
+HTTPS_PORT ?= $(shell grep -E '^PROXY_HTTPS_PORT=' .env 2>/dev/null | cut -d= -f2)
+HTTPS_PORT := $(if $(HTTPS_PORT),$(HTTPS_PORT),8443)
+URL_SUFFIX := $(if $(filter 443,$(HTTPS_PORT)),,:$(HTTPS_PORT))
+CERT := proxy/certs/weekplan.localhost.pem
 
-up:
+up: certs
 	docker compose up -d --build
 	@echo ""
-	@echo "  ➜  http://weekplan.localhost:$(PROXY_PORT)"
+	@echo "  ➜  https://weekplan.localhost$(URL_SUFFIX)"
 	@echo ""
+
+certs: $(CERT)
+
+$(CERT):
+	@command -v mkcert >/dev/null || { echo "Chybí mkcert: brew install mkcert && mkcert -install"; exit 1; }
+	@mkdir -p proxy/certs
+	mkcert -cert-file proxy/certs/weekplan.localhost.pem \
+	       -key-file proxy/certs/weekplan.localhost-key.pem \
+	       weekplan.localhost localhost 127.0.0.1 ::1
+	@echo "Pokud prohlížeč certifikátu nevěří, spusť jednorázově: mkcert -install"
 
 down:
 	docker compose down

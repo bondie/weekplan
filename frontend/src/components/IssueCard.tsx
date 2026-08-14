@@ -1,7 +1,8 @@
 import { useDraggable } from '@dnd-kit/core'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Eye, EyeOff } from 'lucide-react'
 import type { Issue } from '../api/types'
 import { formatMinutes } from '../lib/format'
+import StatusPill from './StatusPill'
 
 const TYPE_TONE: Record<string, string> = {
   bug: 'bg-rose-50 text-rose-700 ring-rose-200',
@@ -16,7 +17,15 @@ function typeTone(issueType: string): string {
   return TYPE_TONE.task
 }
 
-export default function IssueCard({ issue }: { issue: Issue }) {
+export default function IssueCard({
+  issue,
+  hidden = false,
+  onToggleHidden,
+}: {
+  issue: Issue
+  hidden?: boolean
+  onToggleHidden?: () => void
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `issue:${issue.key}`,
     data: { type: 'issue', issue },
@@ -40,21 +49,34 @@ export default function IssueCard({ issue }: { issue: Issue }) {
         <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ${typeTone(issue.issueType)}`}>
           {issue.issueType}
         </span>
-        <a
-          href={issue.url}
-          target="_blank"
-          rel="noreferrer"
-          onPointerDown={(event) => event.stopPropagation()}
-          className="ml-auto text-slate-300 opacity-0 transition group-hover:opacity-100 hover:text-indigo-600"
-        >
-          <ExternalLink className="size-3.5" />
-        </a>
+        <div className="ml-auto flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <a
+            href={issue.url}
+            target="_blank"
+            rel="noreferrer"
+            onPointerDown={(event) => event.stopPropagation()}
+            className="text-slate-300 hover:text-indigo-600"
+            title="Otevřít v JIRA"
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+          {onToggleHidden ? (
+            <button
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={onToggleHidden}
+              className="text-slate-300 hover:text-slate-700"
+              title={hidden ? 'Vrátit do nabídky' : 'Skrýt z nabídky'}
+            >
+              {hidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <p className="clamp-2 mt-1 text-[13px] leading-snug text-slate-700">{issue.summary}</p>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">{issue.status}</span>
+        <StatusPill status={issue.status} category={issue.statusCategory} />
         {estimate ? (
           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">
             {spentAll ? 'odpracováno' : 'zbývá'} {formatMinutes(estimate)}
@@ -62,6 +84,9 @@ export default function IssueCard({ issue }: { issue: Issue }) {
         ) : (
           <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">bez odhadu</span>
         )}
+        {issue.sprintState === 'FUTURE' && issue.sprintName ? (
+          <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">{issue.sprintName}</span>
+        ) : null}
         {issue.plannedMinutes > 0 ? (
           <span
             className={`rounded px-1.5 py-0.5 font-medium ${

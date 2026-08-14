@@ -66,6 +66,13 @@ export function serializeIssue(issue: Issue & { sprint?: Sprint | null }, planne
   }
 }
 
+export interface SprintPayload {
+  id: number
+  name: string
+  startDate: string | null
+  endDate: string | null
+}
+
 export interface EventPayload {
   id: string
   title: string
@@ -122,7 +129,9 @@ export interface WeekPayload {
     freeMinutes: number
     overbookedMinutes: number
   }
-  activeSprints: Array<{ id: number; name: string; startDate: string | null; endDate: string | null }>
+  sprintsForWeek: SprintPayload[]
+  activeSprints: SprintPayload[]
+  nextSprint: SprintPayload | null
 }
 
 function dayCapacity(user: User, key: DateKey, override: DayOverride | undefined, holiday: string | null): number {
@@ -205,6 +214,29 @@ function buildDay(
   }
 }
 
+/** A sprint belongs to the displayed week when their date ranges overlap. */
+export function sprintCoversWeek(
+  sprint: { startDate: Date | string | null; endDate: Date | string | null },
+  weekStart: DateKey,
+): boolean {
+  const start = sprint.startDate ? new Date(sprint.startDate).getTime() : null
+  const end = sprint.endDate ? new Date(sprint.endDate).getTime() : null
+  if (start === null && end === null) return false
+
+  const weekFrom = localDayStart(weekStart).getTime()
+  const weekTo = localDayEnd(addDaysToKey(weekStart, 6)).getTime()
+  return (start ?? -Infinity) < weekTo && (end ?? Infinity) > weekFrom
+}
+
+function serializeSprint(sprint: Sprint): SprintPayload {
+  return {
+    id: sprint.id,
+    name: sprint.name,
+    startDate: sprint.startDate?.toISOString() ?? null,
+    endDate: sprint.endDate?.toISOString() ?? null,
+  }
+}
+
 export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayload> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
   const weekStart = startOfIsoWeek(from)
@@ -228,7 +260,11 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
     prisma.dayOverride.findMany({
       where: { userId, date: { gte: keyToDbDate(weekStart), lte: keyToDbDate(weekEnd) } },
     }),
-    prisma.sprint.findMany({ where: { state: 'ACTIVE' }, orderBy: { endDate: 'asc' } }),
+    prisma.sprint.findMany({
+      where: { state: { in: ['ACTIVE', 'FUTURE'] } },
+      // Sprint ids grow over time, so they order sprints even before dates are filled in.
+      orderBy: [{ startDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
+    }),
   ])
 
   const plannedByIssue = new Map<string, number>()
@@ -277,11 +313,8 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
       freeMinutes: days.reduce((sum, day) => sum + day.freeMinutes, 0),
       overbookedMinutes: days.reduce((sum, day) => sum + day.overbookedMinutes, 0),
     },
-    activeSprints: activeSprints.map((sprint) => ({
-      id: sprint.id,
-      name: sprint.name,
-      startDate: sprint.startDate?.toISOString() ?? null,
-      endDate: sprint.endDate?.toISOString() ?? null,
-    })),
+    sprintsForWeek: activeSprints.filter((sprint) => sprintCoversWeek(sprint, weekStart)).map(serializeSprint),
+    activeSprints: activeSprints.filter((sprint) => sprint.state === 'ACTIVE').map(serializeSprint),
+    nextSprint: activeSprints.filter((sprint) => sprint.state === 'FUTURE').map(serializeSprint)[0] ?? null,
   }
 }

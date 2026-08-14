@@ -141,3 +141,20 @@ export interface JiraSprint {
 export function getSprint(id: number): Promise<JiraSprint> {
   return jiraFetch<JiraSprint>(`/rest/agile/1.0/sprint/${id}`)
 }
+
+/** Upcoming sprints exist before any issue is moved into them, so they come from the board. */
+export async function getBoardSprints(boardId: number): Promise<JiraSprint[]> {
+  const sprints: JiraSprint[] = []
+  let startAt = 0
+
+  for (;;) {
+    const page = await jiraFetch<{ values: JiraSprint[]; isLast: boolean }>(
+      `/rest/agile/1.0/board/${boardId}/sprint?state=active,future&startAt=${startAt}&maxResults=50`,
+    )
+    sprints.push(...page.values)
+    startAt += page.values.length
+    if (page.isLast || page.values.length === 0) break
+  }
+
+  return sprints
+}

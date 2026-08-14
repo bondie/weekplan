@@ -1,4 +1,4 @@
-import type { CalendarSource, IssueList, Me, Scope, SyncStatus, Week } from './types'
+import type { CalendarSource, IssueList, Me, SyncStatus, Week } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -23,12 +23,25 @@ export const api = {
 
   week: (from: string) => request<Week>(`/week?from=${from}`),
 
-  issues: (scope: Scope, q: string, project: string) => {
-    const params = new URLSearchParams({ scope })
+  issues: (
+    week: string,
+    sprints: string[] | null,
+    q: string,
+    project: string,
+    options: { hidden?: boolean; unplanned?: boolean } = {},
+  ) => {
+    const params = new URLSearchParams({ week })
+    // Omitting `sprints` lets the server pick the sprint covering the displayed week.
+    if (sprints) params.set('sprints', sprints.join(','))
     if (q) params.set('q', q)
     if (project) params.set('project', project)
+    if (options.hidden) params.set('hidden', '1')
+    if (options.unplanned) params.set('unplanned', '1')
     return request<IssueList>(`/issues?${params}`)
   },
+
+  hideIssue: (key: string) => request<{ ok: boolean }>(`/issues/${key}/hide`, { method: 'POST' }),
+  unhideIssue: (key: string) => request<{ ok: boolean }>(`/issues/${key}/hide`, { method: 'DELETE' }),
 
   createAssignment: (body: { issueKey: string; date: string; plannedMinutes?: number }, week: string) =>
     request<{ week: Week }>(`/assignments?week=${week}`, { method: 'POST', body: json(body) }),

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Settings } from 'lucide-react'
 import { api } from '../api/client'
+import type { Week } from '../api/types'
 import { usePlanner } from '../hooks/planner'
 import { formatMinutes, formatRange, formatRelative, todayKey } from '../lib/format'
 
@@ -62,11 +63,7 @@ export default function Header({ onOpenSettings }: { onOpenSettings: () => void 
         </div>
       ) : null}
 
-      {week?.activeSprints.length ? (
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-          Sprint: {week.activeSprints.map((sprint) => sprint.name).join(', ')}
-        </span>
-      ) : null}
+      {week ? <SprintBadge week={week} /> : null}
 
       {totals ? (
         <div className="flex items-center gap-4 text-sm">
@@ -114,6 +111,27 @@ export default function Header({ onOpenSettings }: { onOpenSettings: () => void 
         <span className="text-sm font-medium text-slate-600">{me.data?.displayName ?? ''}</span>
       </div>
     </header>
+  )
+}
+
+/** The sprint shown follows the displayed week, not today. */
+function SprintBadge({ week }: { week: Week }) {
+  if (week.sprintsForWeek.length === 0) {
+    return <span className="text-xs text-slate-400">mimo sprint</span>
+  }
+
+  const activeIds = new Set(week.activeSprints.map((sprint) => sprint.id))
+  const isCurrent = week.sprintsForWeek.some((sprint) => activeIds.has(sprint.id))
+
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-medium ring-1 ${
+        isCurrent ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-sky-50 text-sky-700 ring-sky-200'
+      }`}
+    >
+      Sprint: {week.sprintsForWeek.map((sprint) => sprint.name).join(', ')}
+      {isCurrent ? '' : ' (plánovaný)'}
+    </span>
   )
 }
 

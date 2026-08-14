@@ -6,6 +6,7 @@ import type { Assignment } from '../api/types'
 import { usePlanner } from '../hooks/planner'
 import { addDays, formatMinutes } from '../lib/format'
 import MinutesEditor from './MinutesEditor'
+import StatusPill from './StatusPill'
 
 export default function AssignmentCard({ assignment, date }: { assignment: Assignment; date: string }) {
   const planner = usePlanner()
@@ -99,7 +100,11 @@ export default function AssignmentCard({ assignment, date }: { assignment: Assig
           onChange={(minutes) => planner.setMinutes(assignment.id, minutes)}
         />
         {estimate ? <span className="text-[11px] text-slate-400">z {formatMinutes(estimate)}</span> : null}
-        {issue ? <span className="ml-auto text-[10px] text-slate-400">{issue.status}</span> : null}
+        {issue ? (
+          <span className="ml-auto">
+            <StatusPill status={issue.status} category={issue.statusCategory} />
+          </span>
+        ) : null}
       </div>
     </div>
   )
