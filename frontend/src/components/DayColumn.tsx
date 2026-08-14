@@ -99,7 +99,7 @@ export default function DayColumn({ day }: { day: Day }) {
           </div>
         </SortableContext>
 
-        <WorklogList worklogs={day.worklogs} minutes={day.loggedMinutes} />
+        <WorklogList worklogs={day.worklogs} />
 
         {day.assignments.length === 0 && day.events.length === 0 && day.worklogs.length === 0 ? (
           <p className="py-6 text-center text-[11px] text-slate-300">přetáhni sem task</p>
