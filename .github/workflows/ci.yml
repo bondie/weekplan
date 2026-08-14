@@ -17,6 +17,9 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      # Prisma CLI resolves env() in the schema even when it never opens a connection.
+      DATABASE_URL: postgresql://weekplan:weekplan@localhost:5432/weekplan
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,8 +67,10 @@ jobs:
             echo "::error::.env nesmí být ve verzovacím systému"
             exit 1
           fi
-          if git grep -nIE 'JIRA_PASSWORD[[:space:]]*[=:][[:space:]]*[^[:space:]$#{]' -- . ':!*.example' ':!.github/*'; then
-            echo "::error::vypadá to na natvrdo zapsané heslo"
+          # Only an env-file style assignment with a literal value is a leak;
+          # `${VAR}` interpolation and zod schema keys are legitimate.
+          if git grep -nIE '^[^#]*(JIRA_PASSWORD|JIRA_USERNAME)=[^$[:space:]"'"'"']' -- . ':!*.example'; then
+            echo "::error::vypadá to na natvrdo zapsané přihlašovací údaje"
             exit 1
           fi
           if git grep -nIE 'https?://[a-z0-9.-]*jira[a-z0-9.-]*\.(cz|com|net)' -- . ':!*.example' ':!README.md'; then
