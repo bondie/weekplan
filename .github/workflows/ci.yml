@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (typecheck + testy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx prisma generate
+      - run: npx prisma validate
+      - run: npm run typecheck
+      - run: npm test
+
+  frontend:
+    name: Frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+
+  format:
+    name: Formátování (prettier)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes prettier@3 --check .
+
+  secrets:
+    name: Kontrola citlivých údajů
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Žádný .env ani interní hostname v repu
+        run: |
+          set -e
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env nesmí být ve verzovacím systému"
+            exit 1
+          fi
+          if git grep -nIE 'JIRA_PASSWORD[[:space:]]*[=:][[:space:]]*[^[:space:]$#{]' -- . ':!*.example' ':!.github/*'; then
+            echo "::error::vypadá to na natvrdo zapsané heslo"
+            exit 1
+          fi
+          if git grep -nIE 'https?://[a-z0-9.-]*jira[a-z0-9.-]*\.(cz|com|net)' -- . ':!*.example' ':!README.md'; then
+            echo "::error::konkrétní JIRA instance patří jen do .env"
+            exit 1
+          fi
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t weekplan-api ./backend
+      - run: docker build -t weekplan-web ./frontend
