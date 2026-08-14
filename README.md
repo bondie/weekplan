@@ -9,9 +9,10 @@ režie ze schůzek v Outlook / Teams kalendáři.
 ## Co to umí
 
 - **Týdenní kalendář**, defaultně aktuální ISO týden, pondělí–pátek (víkend volitelně).
-- **Panel s tasky z JIRA** rozdělený na aktivní sprint / budoucí sprinty / backlog / vše, s fulltextem
-  a filtrem projektu. Aktivní sprint se vyhodnocuje živě ze stavu v JIRA, takže po přetočení sprintu
-  není potřeba nic přenastavovat.
+- **Panel s tasky z JIRA**, kde se sprint vybírá podle zobrazeného týdne — skok na další týden přepne
+  i sprint. Ostatní sprinty a backlog se dají dozaškrtnout, jednotlivé tasky skrýt a naplánované
+  odfiltrovat. Nabízí se jen běžící řada sprintů: uzavřené ani „odpadkové koše" (sprinty bez dat,
+  kam se odkládají staré tasky) aplikace nezobrazuje.
 - **Drag & drop** tasku na den. Výchozí počet hodin = zbývající odhad, oříznutý volnou kapacitou dne.
 - **Plán je perzistentní** — žije v Postgresu, přežije restart kontejnerů i změny v JIRA.
 - **Rozdělení tasku přes víc dní** (2 h ve středu, 3 h ve čtvrtek) a přesun mezi dny tažením.
@@ -21,6 +22,8 @@ režie ze schůzek v Outlook / Teams kalendáři.
   a přesunutých instancí. Celodenní událost typu „mimo kancelář" srazí kapacitu dne na nulu,
   událost označená jako _volno_ se do režie nepočítá. Překrývající se schůzky se počítají jednou.
 - **Ruční bloky režie** přímo ve dni, když něco v kalendáři ještě není.
+- **Co jsi reálně odpracoval** — u každého dne seznam tasků a hodin vykázaných v JIRA (přes Tempo),
+  v hlavičce součet za aktuální měsíc a celkový objem práce, který na tebe v JIRA čeká.
 - **Přeplánovaný den** je vidět na první pohled (červený pruh + varování v součtech).
 - **Multi-user datový model** — plány, kapacity i kalendáře jsou vázané na uživatele; UI zatím
   zobrazuje jednoho.

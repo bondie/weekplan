@@ -4,6 +4,7 @@ import { DEFAULT_JQL } from '../env'
 import { prisma } from '../lib/prisma'
 import { runCalendarSync } from '../services/calendar/sync'
 import { buildJql, runJiraSync } from '../services/jira/sync'
+import { loggedThisMonth } from '../services/jira/worklogs'
 import { classifySprints, remainingMinutes } from '../services/sprints'
 import { currentUser } from './context'
 
@@ -82,20 +83,30 @@ export async function meRoutes(app: FastifyInstance) {
     let sprintMinutes = 0
     let backlogMinutes = 0
     let withoutEstimate = 0
+    let counted = 0
 
     for (const issue of issues) {
+      const inSprint = issue.sprintId !== null && plannableIds.has(issue.sprintId)
+      // Issues parked in dumping-ground or closed sprints are not upcoming work.
+      if (!inSprint && issue.sprintId !== null) continue
+
       const minutes = remainingMinutes(issue)
+      counted += 1
       if (minutes === 0) withoutEstimate += 1
-      if (issue.sprintId !== null && plannableIds.has(issue.sprintId)) sprintMinutes += minutes
+      if (inSprint) sprintMinutes += minutes
       else backlogMinutes += minutes
     }
+
+    const logged = await loggedThisMonth(user.id)
 
     return {
       remainingMinutes: sprintMinutes + backlogMinutes,
       sprintMinutes,
       backlogMinutes,
-      issueCount: issues.length,
+      issueCount: counted,
       withoutEstimateCount: withoutEstimate,
+      loggedThisMonthMinutes: logged.minutes,
+      month: logged.month,
     }
   })
 

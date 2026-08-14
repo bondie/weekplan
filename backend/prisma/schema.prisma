@@ -27,6 +27,26 @@ model User {
   calendarEvents  CalendarEvent[]
   dayOverrides    DayOverride[]
   hiddenIssues    HiddenIssue[]
+  worklogs        Worklog[]
+}
+
+/// What was actually logged in JIRA (via Tempo), as opposed to what was planned.
+model Worklog {
+  id            String   @id @default(cuid())
+  userId        String
+  tempoId       Int      @unique
+  jiraWorklogId Int?
+  issueKey      String
+  issueSummary  String
+  date          DateTime @db.Date
+  minutes       Int
+  comment       String?
+  role          String?
+  syncedAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }
 
 /// Issues the user never wants to see in the planning panel (stale, wrong project, noise).

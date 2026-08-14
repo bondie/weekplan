@@ -9,6 +9,7 @@ import AssignmentCard from './AssignmentCard'
 import CapacityBar from './CapacityBar'
 import EventChip from './EventChip'
 import { parseMinutes } from './MinutesEditor'
+import WorklogList from './WorklogList'
 
 export default function DayColumn({ day }: { day: Day }) {
   const planner = usePlanner()
@@ -65,6 +66,9 @@ export default function DayColumn({ day }: { day: Day }) {
           {day.overheadMinutes > 0 ? (
             <span className="text-amber-600">režie {formatMinutes(day.overheadMinutes)}</span>
           ) : null}
+          {day.loggedMinutes > 0 ? (
+            <span className="text-emerald-600">vykázáno {formatMinutes(day.loggedMinutes)}</span>
+          ) : null}
           <button
             onClick={() => planner.setDayCapacity(day.date, day.override ? null : 0)}
             className="ml-auto text-slate-300 transition hover:text-slate-600"
@@ -95,7 +99,9 @@ export default function DayColumn({ day }: { day: Day }) {
           </div>
         </SortableContext>
 
-        {day.assignments.length === 0 && day.events.length === 0 ? (
+        <WorklogList worklogs={day.worklogs} minutes={day.loggedMinutes} />
+
+        {day.assignments.length === 0 && day.events.length === 0 && day.worklogs.length === 0 ? (
           <p className="py-6 text-center text-[11px] text-slate-300">přetáhni sem task</p>
         ) : null}
 

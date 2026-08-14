@@ -4,6 +4,7 @@ import { addDaysToKey, keyToDbDate, todayKey } from '../../lib/dates'
 import { prisma } from '../../lib/prisma'
 import { JiraError, getIssue, getMyself, searchIssues, type JiraIssue } from './client'
 import { extractSprintIds, pickSprintId, resolveSprints, syncBoardSprints } from './sprint'
+import { syncWorklogs } from './worklogs'
 
 const HOT_JQL =
   'assignee = "{user}" AND statusCategory != Done AND (sprint in openSprints() OR updated >= -7d) ORDER BY Rank ASC'
@@ -166,6 +167,7 @@ export interface JiraSyncResult {
   hot?: number
   planned?: number
   full?: number
+  worklogs?: number
   error?: string
   authFailed?: boolean
 }
@@ -178,11 +180,13 @@ export async function runJiraSync(options: { full?: boolean } = {}): Promise<Jir
     result.hot = 0
     result.planned = 0
     result.full = 0
+    result.worklogs = 0
 
     for (const user of users) {
       if (options.full) result.full += await syncFull(user)
       else result.hot += await syncHot(user)
       result.planned += await syncPlanned(user)
+      result.worklogs += await syncWorklogs(user)
     }
   } catch (err) {
     result.ok = false

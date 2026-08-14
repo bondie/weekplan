@@ -142,6 +142,23 @@ export function getSprint(id: number): Promise<JiraSprint> {
   return jiraFetch<JiraSprint>(`/rest/agile/1.0/sprint/${id}`)
 }
 
+export interface TempoWorklog {
+  id: number
+  jiraWorklogId?: number
+  timeSpentSeconds: number
+  dateStarted: string
+  comment?: string
+  issue?: { key?: string; summary?: string }
+  author?: { name?: string; key?: string }
+  worklogAttributes?: Array<{ key?: string; value?: string }>
+}
+
+/** Tempo v3 answers "what did this person log between these dates"; core JIRA cannot. */
+export function getTempoWorklogs(username: string, from: string, to: string): Promise<TempoWorklog[]> {
+  const params = new URLSearchParams({ dateFrom: from, dateTo: to, username })
+  return jiraFetch<TempoWorklog[]>(`/rest/tempo-timesheets/3/worklogs?${params}`)
+}
+
 /** Upcoming sprints exist before any issue is moved into them, so they come from the board. */
 export async function getBoardSprints(boardId: number): Promise<JiraSprint[]> {
   const sprints: JiraSprint[] = []

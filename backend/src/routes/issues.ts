@@ -51,7 +51,7 @@ export async function issuesRoutes(app: FastifyInstance) {
     }
 
     const grouped = await prisma.issue.groupBy({ by: ['sprintId'], where: base, _count: { _all: true } })
-    const { plannable, backlogSprintIds } = await classifySprints()
+    const { plannable } = await classifySprints()
 
     const countBySprint = new Map(grouped.map((row) => [row.sprintId, row._count._all]))
 
@@ -72,8 +72,7 @@ export async function issuesRoutes(app: FastifyInstance) {
           a.id - b.id,
       )
 
-    const noSprintCount =
-      (countBySprint.get(null) ?? 0) + backlogSprintIds.reduce((sum, id) => sum + (countBySprint.get(id) ?? 0), 0)
+    const noSprintCount = countBySprint.get(null) ?? 0
 
     // Default view follows the week on screen: the sprint that covers it. Everything else
     // (dumping-ground sprints, closed sprints, backlog) is opt-in.
@@ -100,9 +99,7 @@ export async function issuesRoutes(app: FastifyInstance) {
 
     const sprintFilter: Prisma.IssueWhereInput[] = [
       ...(selectedIds.length > 0 ? [{ sprintId: { in: selectedIds } }] : []),
-      ...(includeNoSprint
-        ? [{ sprintId: null }, ...(backlogSprintIds.length > 0 ? [{ sprintId: { in: backlogSprintIds } }] : [])]
-        : []),
+      ...(includeNoSprint ? [{ sprintId: null }] : []),
     ]
 
     // Searching by name or key looks across every sprint — otherwise an issue would be

@@ -63,6 +63,28 @@ PAT tokeny přišly až v 8.14, takže heslo je jediná možnost. Konfigurace je
 - Default JQL: `assignee = "{user}" AND statusCategory != Done ORDER BY Rank ASC` (`{user}` i
   `currentUser()` se nahrazují uživatelovým JIRA jménem — kvůli budoucímu plánování pro víc lidí).
 
+## Sprinty
+
+- Plánovatelná je jen **běžící řada sprintů**: aktivní sprint a datované sprinty s vyšším id
+  (`services/sprints.ts`). Instance má sprinty typu „Odpadkový koš" — ve stavu FUTURE, bez dat
+  a s id nižším než aktivní sprint. Ty se v aplikaci **nezobrazují vůbec**, stejně jako uzavřené.
+- **Backlog = tasky bez sprintu**, přesně jako v JIRA. Tasky odložené v koši do backlogu nepatří.
+- Výběr sprintu v panelu **sleduje zobrazený týden** (`sprintCoversWeek`) — přeskočením na další
+  týden se přepne i sprint. Ruční zaškrtnutí má přednost, tlačítko „auto" se vrátí k automatice.
+- Hledání **ignoruje filtr sprintů**, aby nešel žádný task ztratit jen proto, že jeho sprint není
+  zaškrtnutý.
+- Uživatel může jednotlivé tasky skrýt (`HiddenIssue`) — na staré nesmysly, které v JIRA visí roky.
+
+## Worklogy (co bylo reálně odpracováno)
+
+- Core JIRA API neumí „co tenhle člověk vykázal mezi daty", proto se čte **Tempo Timesheets v3**:
+  `GET /rest/tempo-timesheets/3/worklogs?dateFrom=&dateTo=&username=`. Vrací i klíč a název issue,
+  komentář a atribut Role.
+- Okno synchronizace je −75 / +7 dní (kvůli součtu za předchozí měsíc těsně po přelomu). Worklogy
+  smazané v JIRA se musí smazat i tady, proto se po upsertu maže vše, co v okně nepřišlo.
+- Zobrazuje se v denním sloupci (co se ten den dělalo) a v hlavičce jako součet za aktuální měsíc.
+- **Zapisovat worklogy aplikace neumí a nemá** — pořád platí read-only kontrakt.
+
 ## Kalendář / režie
 
 - Parser je `services/calendar/ics.ts` nad **ical.js**. Řeší VTIMEZONE, RRULE, EXDATE i přesunuté

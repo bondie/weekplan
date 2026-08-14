@@ -1,4 +1,4 @@
-import type { CalendarEvent, DayOverride, Issue, Sprint, User } from '@prisma/client'
+import type { CalendarEvent, DayOverride, Issue, Sprint, User, Worklog } from '@prisma/client'
 import {
   addDaysToKey,
   dbDateToKey,
@@ -95,6 +95,15 @@ export interface AssignmentPayload {
   issue: IssuePayload | null
 }
 
+export interface WorklogPayload {
+  id: string
+  issueKey: string
+  issueSummary: string
+  minutes: number
+  comment: string | null
+  role: string | null
+}
+
 export interface DayPayload {
   date: DateKey
   weekday: number
@@ -109,9 +118,11 @@ export interface DayPayload {
   freeMinutes: number
   overbookedMinutes: number
   blockedAllDay: boolean
+  loggedMinutes: number
   override: { capacityMinutes: number; note: string | null } | null
   events: EventPayload[]
   assignments: AssignmentPayload[]
+  worklogs: WorklogPayload[]
 }
 
 export interface WeekPayload {
@@ -146,6 +157,7 @@ function buildDay(
   events: CalendarEvent[],
   assignments: Array<{ assignment: AssignmentPayload }>,
   override: DayOverride | undefined,
+  worklogs: Worklog[],
 ): DayPayload {
   const dayStart = localDayStart(key)
   const dayEnd = localDayEnd(key)
@@ -211,6 +223,17 @@ function buildDay(
       }))
       .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.startsAt.localeCompare(b.startsAt)),
     assignments: assignments.map((item) => item.assignment).sort((a, b) => a.position - b.position),
+    loggedMinutes: worklogs.reduce((sum, worklog) => sum + worklog.minutes, 0),
+    worklogs: worklogs
+      .map((worklog) => ({
+        id: worklog.id,
+        issueKey: worklog.issueKey,
+        issueSummary: worklog.issueSummary,
+        minutes: worklog.minutes,
+        comment: worklog.comment,
+        role: worklog.role,
+      }))
+      .sort((a, b) => b.minutes - a.minutes),
   }
 }
 
@@ -243,7 +266,7 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
   const keys = Array.from({ length: 7 }, (_, index) => addDaysToKey(weekStart, index))
   const weekEnd = keys[6]
 
-  const [assignments, events, overrides, activeSprints] = await Promise.all([
+  const [assignments, events, overrides, activeSprints, worklogs] = await Promise.all([
     prisma.assignment.findMany({
       where: { userId, date: { gte: keyToDbDate(weekStart), lte: keyToDbDate(weekEnd) } },
       include: { issue: { include: { sprint: true } } },
@@ -264,6 +287,9 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
       where: { state: { in: ['ACTIVE', 'FUTURE'] } },
       // Sprint ids grow over time, so they order sprints even before dates are filled in.
       orderBy: [{ startDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
+    }),
+    prisma.worklog.findMany({
+      where: { userId, date: { gte: keyToDbDate(weekStart), lte: keyToDbDate(weekEnd) } },
     }),
   ])
 
@@ -295,7 +321,15 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
   }
 
   const overrideByDay = new Map(overrides.map((override) => [dbDateToKey(override.date), override]))
-  const days = keys.map((key) => buildDay(user, key, events, byDay.get(key) ?? [], overrideByDay.get(key)))
+  const worklogsByDay = new Map<DateKey, Worklog[]>()
+  for (const worklog of worklogs) {
+    const key = dbDateToKey(worklog.date)
+    worklogsByDay.set(key, [...(worklogsByDay.get(key) ?? []), worklog])
+  }
+
+  const days = keys.map((key) =>
+    buildDay(user, key, events, byDay.get(key) ?? [], overrideByDay.get(key), worklogsByDay.get(key) ?? []),
+  )
   const { week, year } = isoWeekNumber(weekStart)
 
   return {

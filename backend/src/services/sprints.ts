@@ -3,15 +3,14 @@ import { prisma } from '../lib/prisma'
 
 /**
  * Only the running sprint series is plannable: the active sprint and the dated sprints that
- * follow it. Dumping-ground sprints are FUTURE too, but they carry no dates and their ids
- * predate the active sprint — their issues belong to the backlog. Closed sprints are history
- * and, like in JIRA, part of neither.
+ * follow it. Everything else — closed sprints and the dateless dumping grounds old tasks get
+ * parked in — is out of scope for planning. Their issues are not backlog either: the backlog
+ * is what JIRA calls the backlog, i.e. issues in no sprint at all.
  */
 export interface SprintClassification {
   all: Sprint[]
   plannable: Sprint[]
   plannableIds: Set<number>
-  backlogSprintIds: number[]
 }
 
 export async function classifySprints(): Promise<SprintClassification> {
@@ -30,14 +29,7 @@ export async function classifySprints(): Promise<SprintClassification> {
 
   const plannableIds = new Set(plannable.map((sprint) => sprint.id))
 
-  return {
-    all,
-    plannable,
-    plannableIds,
-    backlogSprintIds: all
-      .filter((sprint) => !plannableIds.has(sprint.id) && sprint.state !== 'CLOSED')
-      .map((sprint) => sprint.id),
-  }
+  return { all, plannable, plannableIds }
 }
 
 /** A zero remaining estimate means the work was logged, not that the task takes no time. */

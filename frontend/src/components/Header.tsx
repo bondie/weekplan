@@ -80,15 +80,22 @@ export default function Header({ onOpenSettings }: { onOpenSettings: () => void 
       ) : null}
 
       {workload.data ? (
-        <span
-          className="flex items-baseline gap-1 border-l border-slate-200 pl-4 text-sm"
-          title={`Ve sprintech ${formatMinutes(workload.data.sprintMinutes)}, v backlogu ${formatMinutes(
-            workload.data.backlogMinutes,
-          )} · ${workload.data.issueCount} tasků, z toho ${workload.data.withoutEstimateCount} bez odhadu`}
-        >
-          <span className="font-semibold text-slate-700">{formatMinutes(workload.data.remainingMinutes)}</span>
-          <span className="text-xs text-slate-400">zbývá vykázat celkem</span>
-        </span>
+        <div className="flex items-center gap-4 border-l border-slate-200 pl-4 text-sm">
+          <span
+            className="flex items-baseline gap-1"
+            title={`Ve sprintech ${formatMinutes(workload.data.sprintMinutes)}, v backlogu ${formatMinutes(
+              workload.data.backlogMinutes,
+            )} · ${workload.data.issueCount} tasků, z toho ${workload.data.withoutEstimateCount} bez odhadu`}
+          >
+            <span className="font-semibold text-slate-700">{formatMinutes(workload.data.remainingMinutes)}</span>
+            <span className="text-xs text-slate-400">zbývá odpracovat</span>
+          </span>
+          <Metric
+            label="vykázáno tento měsíc"
+            value={formatMinutes(workload.data.loggedThisMonthMinutes)}
+            tone="emerald"
+          />
+        </div>
       ) : null}
 
       <div className="ml-auto flex items-center gap-3">

@@ -58,9 +58,11 @@ export interface Day {
   freeMinutes: number
   overbookedMinutes: number
   blockedAllDay: boolean
+  loggedMinutes: number
   override: { capacityMinutes: number; note: string | null } | null
   events: CalendarEventItem[]
   assignments: Assignment[]
+  worklogs: WorklogItem[]
 }
 
 export interface Sprint {
@@ -138,6 +140,17 @@ export interface Workload {
   backlogMinutes: number
   issueCount: number
   withoutEstimateCount: number
+  loggedThisMonthMinutes: number
+  month: string
+}
+
+export interface WorklogItem {
+  id: string
+  issueKey: string
+  issueSummary: string
+  minutes: number
+  comment: string | null
+  role: string | null
 }
 
 export interface SyncStatus {
