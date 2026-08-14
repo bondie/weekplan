@@ -3,7 +3,9 @@ import type { CalendarSource, IssueList, Me, RecurringOverhead, SyncStatus, Week
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    // Fastify rejects a JSON content type with an empty body, which every DELETE and
+    // body-less POST would otherwise send.
+    headers: { ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...(init?.headers ?? {}) },
   })
 
   if (!res.ok) {
