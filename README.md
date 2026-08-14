@@ -99,7 +99,12 @@ Podrobnosti k vývoji jsou v [CLAUDE.md](CLAUDE.md).
 
 ```bash
 cd backend && npm install && npm test    # datumy vč. přechodu na letní čas, parsování sprintu, ICS
+cd frontend && npm install && npm test   # tvar požadavků na API
+make e2e                                 # Playwright nad celým stackem proti falešné JIRA
 ```
+
+E2E testy si nastartují vlastní stack (jiný compose projekt, porty 3011/5181) proti mocku JIRA,
+takže běží offline a nesáhnou na tvoje data ani na produkční JIRA. Úklid: `make e2e-down`.
 
 CI na GitHubu hlídá typy, testy, build frontendu, formátování a to, že se do repa nedostane `.env`
 ani konkrétní JIRA instance.

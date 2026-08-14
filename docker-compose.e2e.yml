@@ -1,0 +1,40 @@
+# Run with a separate project name so it never touches the real stack or its data:
+#   docker compose -p weekplan-e2e -f docker-compose.yml -f docker-compose.e2e.yml up -d db api web
+services:
+  jira-mock:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./e2e/jira-mock.mjs:/app/jira-mock.mjs:ro
+    command: node jira-mock.mjs
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:8080/rest/api/2/myself').then(r=>process.exit(r.ok?0:1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  db:
+    ports: !override []
+
+  api:
+    environment:
+      JIRA_URL: http://jira-mock:8080
+      JIRA_USERNAME: e2e.user@example.com
+      JIRA_PASSWORD: e2e
+      # Tests trigger syncs themselves; a cron would race their assertions.
+      JIRA_SYNC_CRON: '0 0 31 2 *'
+      JIRA_FULL_SYNC_CRON: '0 0 31 2 *'
+      CALENDAR_SYNC_CRON: '0 0 31 2 *'
+      ICS_URL: ''
+    ports: !override ['127.0.0.1:3011:3010']
+    depends_on:
+      jira-mock:
+        condition: service_healthy
+
+  web:
+    environment:
+      E2E: '1'
+    ports: !override ['127.0.0.1:5181:5180']
+
+  proxy:
+    profiles: ['disabled']

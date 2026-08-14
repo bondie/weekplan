@@ -23,6 +23,7 @@ export default function AssignmentCard({ assignment, date }: { assignment: Assig
   return (
     <div
       ref={setNodeRef}
+      data-testid={`assignment-${assignment.issueKey}`}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...listeners}
       {...attributes}

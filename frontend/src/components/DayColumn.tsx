@@ -1,12 +1,13 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Coffee, Plus, X } from 'lucide-react'
+import { Palmtree, PartyPopper, Plus, X } from 'lucide-react'
 import { useState, type KeyboardEvent } from 'react'
 import type { Day } from '../api/types'
 import { usePlanner } from '../hooks/planner'
 import { formatDayLabel, formatMinutes } from '../lib/format'
 import AssignmentCard from './AssignmentCard'
 import CapacityBar from './CapacityBar'
+import DayOffMenu from './DayOffMenu'
 import EventChip from './EventChip'
 import { parseMinutes } from './MinutesEditor'
 import WorklogList from './WorklogList'
@@ -39,10 +40,19 @@ export default function DayColumn({ day }: { day: Day }) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-w-0 flex-1 flex-col rounded-xl border bg-white transition ${
-        day.isToday ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-slate-200'
-      } ${isOver ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-200' : ''} ${
-        !day.isWorkingDay ? 'bg-slate-50' : ''
+      data-testid={`day-${day.date}`}
+      // Stripes read as "this day is out of play" without shouting like a colour would.
+      style={
+        day.dayOff
+          ? {
+              backgroundImage: 'repeating-linear-gradient(135deg, var(--color-slate-100) 0 8px, transparent 8px 16px)',
+            }
+          : undefined
+      }
+      className={`flex min-w-0 flex-1 flex-col rounded-xl border transition ${
+        day.dayOff ? 'border-slate-200 bg-slate-50/80' : 'bg-white'
+      } ${day.isToday ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-slate-200'} ${
+        isOver ? 'border-indigo-400 bg-indigo-50/40 ring-2 ring-indigo-200' : ''
       }`}
     >
       <div className="border-b border-slate-100 p-2.5">
@@ -52,9 +62,13 @@ export default function DayColumn({ day }: { day: Day }) {
           </span>
           <span className="text-xs text-slate-400">{dayLabel}</span>
 
-          {day.holiday ? (
-            <span className="ml-auto truncate rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-700">
-              {day.holiday}
+          {day.dayOff ? (
+            <span
+              className={`ml-auto truncate rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                day.dayOff.kind === 'holiday' ? 'bg-violet-50 text-violet-700' : 'bg-amber-50 text-amber-700'
+              }`}
+            >
+              {day.dayOff.reason}
             </span>
           ) : day.overbookedMinutes > 0 ? (
             <span className="ml-auto rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
@@ -68,8 +82,10 @@ export default function DayColumn({ day }: { day: Day }) {
         </div>
 
         <div className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-500">
-          <span>
-            {formatMinutes(day.plannedMinutes)} / {formatMinutes(day.availableMinutes)}
+          <span data-testid="capacity">
+            {day.dayOff && day.capacityMinutes === 0
+              ? 'nepracuji'
+              : `${formatMinutes(day.plannedMinutes)} / ${formatMinutes(day.availableMinutes)}`}
           </span>
           {day.overheadMinutes > 0 ? (
             <span className="text-amber-600">režie {formatMinutes(day.overheadMinutes)}</span>
@@ -77,13 +93,9 @@ export default function DayColumn({ day }: { day: Day }) {
           {day.loggedMinutes > 0 ? (
             <span className="text-emerald-600">vykázáno {formatMinutes(day.loggedMinutes)}</span>
           ) : null}
-          <button
-            onClick={() => planner.setDayCapacity(day.date, day.override ? null : 0)}
-            className="ml-auto text-slate-300 transition hover:text-slate-600"
-            title={day.override ? 'Zrušit úpravu kapacity' : 'Volno / dovolená (0 h)'}
-          >
-            <Coffee className="size-3.5" />
-          </button>
+          <span className="ml-auto">
+            <DayOffMenu day={day} />
+          </span>
         </div>
       </div>
 
@@ -109,8 +121,25 @@ export default function DayColumn({ day }: { day: Day }) {
 
         <WorklogList worklogs={day.worklogs} />
 
-        {day.assignments.length === 0 && day.events.length === 0 && day.worklogs.length === 0 ? (
+        {day.dayOff && day.assignments.length === 0 && day.worklogs.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-8 text-center">
+            {day.dayOff.kind === 'holiday' ? (
+              <PartyPopper className="size-5 text-violet-400" />
+            ) : (
+              <Palmtree className="size-5 text-amber-400" />
+            )}
+            <span className="text-xs font-medium text-slate-500">{day.dayOff.reason}</span>
+          </div>
+        ) : null}
+
+        {!day.dayOff && day.assignments.length === 0 && day.events.length === 0 && day.worklogs.length === 0 ? (
           <p className="py-6 text-center text-[11px] text-slate-300">přetáhni sem task</p>
+        ) : null}
+
+        {day.dayOff && day.assignments.length > 0 ? (
+          <p className="rounded bg-amber-50 px-1.5 py-1 text-[10px] text-amber-700">
+            {day.dayOff.reason}, ale máš tu naplánováno {formatMinutes(day.plannedMinutes)}
+          </p>
         ) : null}
 
         {adding ? (
@@ -155,6 +184,7 @@ export default function DayColumn({ day }: { day: Day }) {
         ) : (
           <button
             onClick={() => setAdding(true)}
+            data-testid="add-overhead"
             className="mt-auto flex items-center justify-center gap-1 rounded-md border border-dashed border-slate-200 py-1 text-[11px] text-slate-400 transition hover:border-amber-300 hover:text-amber-600"
           >
             <Plus className="size-3" />

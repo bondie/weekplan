@@ -67,6 +67,7 @@ export interface Day {
   freeMinutes: number
   overbookedMinutes: number
   blockedAllDay: boolean
+  dayOff: { reason: string; kind: 'holiday' | 'calendar' | 'override' | 'weekend' } | null
   loggedMinutes: number
   loggedOverheadMinutes: number
   override: { capacityMinutes: number; note: string | null } | null

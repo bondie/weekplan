@@ -38,6 +38,7 @@ export default function IssueCard({
   return (
     <div
       ref={setNodeRef}
+      data-testid={`issue-${issue.key}`}
       {...listeners}
       {...attributes}
       className={`group cursor-grab rounded-lg border border-slate-200 bg-white p-2.5 shadow-xs transition hover:border-indigo-300 hover:shadow-sm ${

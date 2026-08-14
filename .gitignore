@@ -3,6 +3,8 @@ proxy/certs/
 node_modules/
 dist/
 coverage/
+e2e/test-results/
+e2e/playwright-report/
 *.log
 .DS_Store
 .idea/

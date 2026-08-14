@@ -159,6 +159,21 @@ Prisma engine (darwin vs linux).
 datumy včetně přechodů na letní/zimní čas, slučování intervalů, svátky, parsování sprintu
 a expanze ICS. Testy nejdou na síť ani do DB.
 
+## E2E testy
+
+`make e2e` — Playwright proti **falešné JIRA** (`e2e/jira-mock.mjs`), takže testy běží offline,
+deterministicky a nesahají na produkční instanci. Stack jede pod vlastním compose projektem
+(`weekplan-e2e`, porty 3011/5181), aby ti nezasáhl do dat v běžném stacku; `make e2e-down` ho zruší.
+
+- Mock implementuje jen to, co appka volá: `/myself`, `/search`, board issues a sprinty,
+  detail sprintu a Tempo worklogy. Data generuje k aktuálnímu týdnu, takže testy nestárnou.
+- Crony jsou v e2e vypnuté (nesmyslný cron výraz), aby nezávodily s aserty; synchronizaci
+  spouští `global-setup.ts`.
+- Testy sahají na `data-testid` (`issue-*`, `day-*`, `assignment-*`, `capacity`, `add-overhead`,
+  `day-off-menu`, `sprint-picker`). Když je budeš měnit, měň je i v testech.
+- dnd-kit se rozjede až po překročení aktivační vzdálenosti — drag proto musí jít přes
+  `page.mouse` s několika kroky, `dragTo()` nestačí.
+
 ## CI
 
 `.github/workflows/ci.yml`: typecheck + testy backendu, build frontendu, prettier, docker build

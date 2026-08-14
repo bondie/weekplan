@@ -18,7 +18,7 @@ interface PlannerValue {
   remove: (id: string) => void
   split: (id: string, date: string, minutes: number) => void
   reorder: (date: string, ids: string[]) => void
-  setDayCapacity: (date: string, minutes: number | null) => void
+  setDayCapacity: (date: string, minutes: number | null, note?: string) => void
   addManualEvent: (input: { date: string; title: string; startTime: string; minutes: number }) => void
   setEventCounts: (id: string, countsToCapacity: boolean) => void
   deleteEvent: (id: string) => void
@@ -80,10 +80,10 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   })
 
   const capacityMutation = useMutation({
-    mutationFn: (input: { date: string; minutes: number | null }) =>
+    mutationFn: (input: { date: string; minutes: number | null; note?: string }) =>
       input.minutes === null
         ? api.clearDayCapacity(input.date)
-        : api.setDayCapacity(input.date, { capacityMinutes: input.minutes }),
+        : api.setDayCapacity(input.date, { capacityMinutes: input.minutes, note: input.note ?? null }),
     onSuccess,
     scope,
   })
@@ -123,7 +123,7 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
       remove: (id) => deleteMutation.mutate(id),
       split: (id, date, minutes) => splitMutation.mutate({ id, date, minutes }),
       reorder: (date, ids) => reorderMutation.mutate({ date, ids }),
-      setDayCapacity: (date, minutes) => capacityMutation.mutate({ date, minutes }),
+      setDayCapacity: (date, minutes, note) => capacityMutation.mutate({ date, minutes, note }),
       addManualEvent: (input) => manualEventMutation.mutate(input),
       setEventCounts: (id, countsToCapacity) => eventPatchMutation.mutate({ id, countsToCapacity }),
       deleteEvent: (id) => eventDeleteMutation.mutate(id),

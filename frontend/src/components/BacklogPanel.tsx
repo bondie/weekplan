@@ -80,6 +80,7 @@ export default function BacklogPanel() {
 
         <div ref={pickerRef} className="relative">
           <button
+            data-testid="sprint-picker"
             onClick={() => setPickerOpen((open) => !open)}
             className="flex w-full items-center gap-1.5 rounded-md border border-slate-200 px-2 py-1.5 text-left text-xs text-slate-600 hover:border-slate-300"
           >
@@ -133,7 +134,12 @@ export default function BacklogPanel() {
                 ))}
 
                 <label className="flex cursor-pointer items-center gap-2 rounded border-t border-slate-100 px-1.5 py-1 text-xs hover:bg-slate-50">
-                  <input type="checkbox" checked={applied.includes('none')} onChange={() => toggle('none')} />
+                  <input
+                    type="checkbox"
+                    data-testid="sprint-option-none"
+                    checked={applied.includes('none')}
+                    onChange={() => toggle('none')}
+                  />
                   <span className="text-slate-700">Backlog</span>
                   <span className="ml-auto text-slate-400">{issues.data?.noSprintCount ?? 0}</span>
                 </label>

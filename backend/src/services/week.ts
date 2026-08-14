@@ -106,6 +106,11 @@ export interface WorklogPayload {
   isOverhead: boolean
 }
 
+export interface DayOffPayload {
+  reason: string
+  kind: 'holiday' | 'calendar' | 'override' | 'weekend'
+}
+
 export interface DayPayload {
   date: DateKey
   weekday: number
@@ -120,6 +125,7 @@ export interface DayPayload {
   freeMinutes: number
   overbookedMinutes: number
   blockedAllDay: boolean
+  dayOff: DayOffPayload | null
   loggedMinutes: number
   loggedOverheadMinutes: number
   override: { capacityMinutes: number; note: string | null } | null
@@ -178,7 +184,8 @@ function buildDay(
       (event.allDay && dbDateToKey(event.localDate) === key),
   )
 
-  const blockedAllDay = dayEvents.some((event) => event.allDay && event.countsToCapacity)
+  const allDayBlock = dayEvents.find((event) => event.allDay && event.countsToCapacity)
+  const blockedAllDay = allDayBlock !== undefined
 
   const busyIntervals: Array<[number, number]> = dayEvents
     .filter((event) => event.countsToCapacity && !event.allDay)
@@ -207,6 +214,16 @@ function buildDay(
   const availableMinutes = Math.max(0, capacityMinutes - overheadMinutes)
   const plannedMinutes = assignments.reduce((sum, item) => sum + item.assignment.plannedMinutes, 0)
 
+  const dayOff: DayOffPayload | null = holiday
+    ? { reason: holiday, kind: 'holiday' }
+    : allDayBlock
+      ? { reason: allDayBlock.title, kind: 'calendar' }
+      : override?.capacityMinutes === 0
+        ? { reason: override.note?.trim() || 'Volno', kind: 'override' }
+        : !user.workingDays.includes(isoWeekday(key))
+          ? { reason: 'Víkend', kind: 'weekend' }
+          : null
+
   return {
     date: key,
     weekday: isoWeekday(key),
@@ -221,6 +238,7 @@ function buildDay(
     freeMinutes: Math.max(0, availableMinutes - plannedMinutes),
     overbookedMinutes: Math.max(0, plannedMinutes - availableMinutes),
     blockedAllDay,
+    dayOff,
     override: override ? { capacityMinutes: override.capacityMinutes, note: override.note } : null,
     events: [
       ...dayEvents

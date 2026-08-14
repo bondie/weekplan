@@ -63,3 +63,16 @@ shell-api:
 reset-db:
 	docker compose down -v
 	docker compose up -d --build
+
+E2E_COMPOSE = docker compose -p weekplan-e2e -f docker-compose.yml -f docker-compose.e2e.yml
+E2E_ENV = JIRA_URL=http://jira-mock:8080 JIRA_USERNAME=e2e.user@example.com JIRA_PASSWORD=e2e
+
+# Runs against a mock JIRA in its own project, so the real stack and its data stay untouched.
+e2e: e2e-up
+	cd e2e && npm install --no-audit --no-fund && npx playwright install chromium && npx playwright test
+
+e2e-up:
+	$(E2E_ENV) $(E2E_COMPOSE) up -d --build db jira-mock api web
+
+e2e-down:
+	$(E2E_ENV) $(E2E_COMPOSE) down -v
