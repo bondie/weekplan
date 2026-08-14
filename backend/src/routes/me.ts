@@ -6,6 +6,7 @@ import { runCalendarSync } from '../services/calendar/sync'
 import { buildJql, runJiraSync } from '../services/jira/sync'
 import { loggedThisMonth } from '../services/jira/worklogs'
 import { classifySprints, remainingMinutes } from '../services/sprints'
+import { serializeIssue } from '../services/week'
 import { currentUser } from './context'
 
 const patchSchema = z.object({
@@ -83,17 +84,18 @@ export async function meRoutes(app: FastifyInstance) {
         assigneeUsername: user.jiraUsername,
         isResolved: false,
         isOrphaned: false,
+        isSubtask: false,
         // Overhead is not deliverable work — counting it would skew "how much is left".
         projectKey: { notIn: [...user.ignoredProjects, ...(user.overheadProject ? [user.overheadProject] : [])] },
         ...(hiddenIds.length > 0 ? { id: { notIn: hiddenIds } } : {}),
       },
-      select: { remainingEstimateMin: true, originalEstimateMin: true, sprintId: true },
+      include: { sprint: true },
     })
 
     let sprintMinutes = 0
     let backlogMinutes = 0
     let withoutEstimate = 0
-    let counted = 0
+    const counted: typeof issues = []
 
     for (const issue of issues) {
       const inSprint = issue.sprintId !== null && plannableIds.has(issue.sprintId)
@@ -101,11 +103,18 @@ export async function meRoutes(app: FastifyInstance) {
       if (!inSprint && issue.sprintId !== null) continue
 
       const minutes = remainingMinutes(issue)
-      counted += 1
+      counted.push(issue)
       if (minutes === 0) withoutEstimate += 1
       if (inSprint) sprintMinutes += minutes
       else backlogMinutes += minutes
     }
+
+    const planned = await prisma.assignment.groupBy({
+      by: ['issueId'],
+      where: { userId: user.id, issueId: { in: counted.map((issue) => issue.id) } },
+      _sum: { plannedMinutes: true },
+    })
+    const plannedByIssue = new Map(planned.map((row) => [row.issueId, row._sum.plannedMinutes ?? 0]))
 
     const logged = await loggedThisMonth(user.id)
 
@@ -113,10 +122,17 @@ export async function meRoutes(app: FastifyInstance) {
       remainingMinutes: sprintMinutes + backlogMinutes,
       sprintMinutes,
       backlogMinutes,
-      issueCount: counted,
+      issueCount: counted.length,
       withoutEstimateCount: withoutEstimate,
       loggedThisMonthMinutes: logged.minutes,
       month: logged.month,
+      issues: counted
+        .map((issue) => serializeIssue(issue, plannedByIssue.get(issue.id) ?? 0))
+        .sort(
+          (a, b) =>
+            (b.remainingEstimateMin || b.originalEstimateMin || 0) -
+            (a.remainingEstimateMin || a.originalEstimateMin || 0),
+        ),
     }
   })
 

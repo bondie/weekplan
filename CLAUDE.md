@@ -50,9 +50,12 @@ PAT tokeny přišly až v 8.14, takže heslo je jediná možnost. Konfigurace je
   Aktivní sprint se mění každý týden, proto se stav nikde nefixuje a cache pro ne-CLOSED sprinty
   expiruje po hodině.
 - Další custom fieldy: `customfield_10009` = Rank (řazení backlogu), `customfield_10002` = Story Points.
-- Odhady: `timetracking.originalEstimateSeconds` / `remainingEstimateSeconds`. **Zbývající odhad 0
-  neznamená „nula práce"**, ale „všechno je odpracované" — proto se všude používá
-  `remaining || original || fallback`, ne `??`.
+- Odhady: `timetracking.originalEstimateSeconds` / `remainingEstimateSeconds`. Pozor na dvě různé
+  sémantiky nuly:
+  - **Kolik zbývá odpracovat** (`remainingMinutes()`): nula je nula, čas už je vykázaný →
+    `remaining ?? original ?? 0`.
+  - **Kolik hodin nabídnout při přetažení karty na den**: nula by neměla co naplánovat →
+    `remaining || original || 120`.
 - Synchronizace má tři vlny (`services/jira/sync.ts`):
   - `syncHot` — aktivní sprint + změněné za posledních 7 dní, každých 5 minut,
   - `syncPlanned` — tasky, které mají assignment, dotahované **podle klíčů**; jen tak se pozná,
@@ -74,9 +77,12 @@ PAT tokeny přišly až v 8.14, takže heslo je jediná možnost. Konfigurace je
 - Hledání **ignoruje filtr sprintů**, aby nešel žádný task ztratit jen proto, že jeho sprint není
   zaškrtnutý.
 - Uživatel může jednotlivé tasky skrýt (`HiddenIssue`) — na staré nesmysly, které v JIRA visí roky.
-- `User.ignoredProjects` vyřazuje celé projekty (typicky ty, kam se nedá vykazovat). JIRA ukazuje
-  backlog **boardu**, aplikace se ptá napříč instancí — bez tohohle filtru se v backlogu objeví
-  i projekty, které uživatel na svém boardu nikdy nevidí.
+- `User.boardId` omezí synchronizaci na jeden board (`/rest/agile/1.0/board/{id}/issue?jql=…`).
+  JIRA ukazuje backlog **boardu**, ne celé instance — bez tohohle je backlog v aplikaci širší než
+  ten, který uživatel zná.
+- **Sub-tasky se nezobrazují.** Agile API je v backlogu vrací, ale JIRA je v backlogu nikdy
+  neukazuje — proto `Issue.isSubtask` a filtr na něj. Bez toho lidi hlásí tasky, které „v JIRA nemají".
+- `User.ignoredProjects` vyřazuje celé projekty (typicky ty, kam se nedá vykazovat).
 - `User.overheadProject` označuje projekt s režií (měsíčně rotující task). Jeho výkazy jsou ve dnech
   odlišené a **nepočítají se do zbývající práce** — jinak by ji nafoukly o něco, co není dodávka.
 

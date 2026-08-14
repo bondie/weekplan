@@ -145,6 +145,7 @@ export interface Workload {
   withoutEstimateCount: number
   loggedThisMonthMinutes: number
   month: string
+  issues: Issue[]
 }
 
 export interface WorklogItem {

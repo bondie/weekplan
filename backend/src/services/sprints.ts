@@ -32,7 +32,11 @@ export async function classifySprints(): Promise<SprintClassification> {
   return { all, plannable, plannableIds }
 }
 
-/** A zero remaining estimate means the work was logged, not that the task takes no time. */
+/**
+ * How much work is genuinely left. A zero remaining estimate means zero — the time was already
+ * logged. Only a missing remaining estimate falls back to the original one.
+ * (Planning a card uses a different rule: there a zero would leave nothing to schedule.)
+ */
 export function remainingMinutes(issue: { remainingEstimateMin: number | null; originalEstimateMin: number | null }) {
-  return issue.remainingEstimateMin || issue.originalEstimateMin || 0
+  return issue.remainingEstimateMin ?? issue.originalEstimateMin ?? 0
 }

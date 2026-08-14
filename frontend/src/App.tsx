@@ -15,6 +15,7 @@ import BacklogPanel from './components/BacklogPanel'
 import Header from './components/Header'
 import SettingsDialog from './components/SettingsDialog'
 import WeekGrid from './components/WeekGrid'
+import WorkloadDialog from './components/WorkloadDialog'
 import { PlannerProvider, usePlanner } from './hooks/planner'
 import type { Issue } from './api/types'
 
@@ -29,6 +30,7 @@ function Planner() {
   const planner = usePlanner()
   const [dragged, setDragged] = useState<DragPayload | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [workloadOpen, setWorkloadOpen] = useState(false)
 
   const sensors = useSensors(
     // Without a distance threshold a card could never be clicked, only dragged.
@@ -92,7 +94,7 @@ function Planner() {
       onDragCancel={() => setDragged(null)}
     >
       <div className="flex h-screen flex-col bg-slate-100">
-        <Header onOpenSettings={() => setSettingsOpen(true)} />
+        <Header onOpenSettings={() => setSettingsOpen(true)} onOpenWorkload={() => setWorkloadOpen(true)} />
         <div className="flex min-h-0 flex-1 gap-4 p-4">
           <BacklogPanel />
           <WeekGrid />
@@ -109,6 +111,7 @@ function Planner() {
       </DragOverlay>
 
       {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
+      {workloadOpen ? <WorkloadDialog onClose={() => setWorkloadOpen(false)} /> : null}
     </DndContext>
   )
 }

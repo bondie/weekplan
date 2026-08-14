@@ -47,7 +47,9 @@ export async function issuesRoutes(app: FastifyInstance) {
       assigneeUsername: user.jiraUsername,
       isResolved: false,
       isOrphaned: false,
-      ...(user.ignoredProjects.length > 0 ? { projectKey: { notIn: user.ignoredProjects } } : {}),
+      isSubtask: false,
+      // Overhead is planned from the calendar, not by dragging its monthly task around.
+      projectKey: { notIn: [...user.ignoredProjects, ...(user.overheadProject ? [user.overheadProject] : [])] },
       ...(hidden ? { id: { in: hiddenIds } } : excluded.length > 0 ? { id: { notIn: excluded } } : {}),
     }
 

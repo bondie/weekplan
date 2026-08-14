@@ -5,7 +5,13 @@ import type { Week } from '../api/types'
 import { usePlanner } from '../hooks/planner'
 import { formatMinutes, formatRange, formatRelative, todayKey } from '../lib/format'
 
-export default function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
+export default function Header({
+  onOpenSettings,
+  onOpenWorkload,
+}: {
+  onOpenSettings: () => void
+  onOpenWorkload: () => void
+}) {
   const { week, shiftWeek, goToWeek } = usePlanner()
   const queryClient = useQueryClient()
 
@@ -81,15 +87,14 @@ export default function Header({ onOpenSettings }: { onOpenSettings: () => void 
 
       {workload.data ? (
         <div className="flex items-center gap-4 border-l border-slate-200 pl-4 text-sm">
-          <span
-            className="flex items-baseline gap-1"
-            title={`Ve sprintech ${formatMinutes(workload.data.sprintMinutes)}, v backlogu ${formatMinutes(
-              workload.data.backlogMinutes,
-            )} · ${workload.data.issueCount} tasků, z toho ${workload.data.withoutEstimateCount} bez odhadu`}
+          <button
+            onClick={onOpenWorkload}
+            className="flex items-baseline gap-1 rounded px-1 py-0.5 hover:bg-slate-100"
+            title="Zobrazit tasky, na kterých zbývá čas"
           >
             <span className="font-semibold text-slate-700">{formatMinutes(workload.data.remainingMinutes)}</span>
             <span className="text-xs text-slate-400">zbývá odpracovat</span>
-          </span>
+          </button>
           <Metric
             label="vykázáno tento měsíc"
             value={formatMinutes(workload.data.loggedThisMonthMinutes)}

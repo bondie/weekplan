@@ -17,6 +17,7 @@ model User {
   workingDays          Int[]    @default([1, 2, 3, 4, 5]) // ISO weekday 1=Mon .. 7=Sun
   timezone             String   @default("Europe/Prague")
   jql                  String? // overrides the default query; {user} expands to jiraUsername
+  boardId              Int? // scopes planning to one JIRA board, matching its backlog exactly
   ignoredProjects      String[] @default([]) // project keys that never show up in planning
   overheadProject      String? // project whose worklogs count as overhead (the monthly "režie" task)
   showWeekend          Boolean  @default(false)
@@ -73,6 +74,7 @@ model Issue {
   status               String
   statusCategory       String // new | indeterminate | done
   issueType            String
+  isSubtask            Boolean   @default(false) // JIRA boards never list sub-tasks in the backlog
   projectKey           String
   projectName          String
   priority             String?

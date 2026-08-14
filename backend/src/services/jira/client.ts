@@ -124,6 +124,32 @@ export async function searchIssues(jql: string, maxTotal = 2000): Promise<JiraIs
   return issues
 }
 
+/**
+ * Same query, but limited to what a board shows. JIRA's own backlog is a board view, so this is
+ * the only way to make the panel match what the user sees in JIRA.
+ */
+export async function searchBoardIssues(boardId: number, jql: string, maxTotal = 2000): Promise<JiraIssue[]> {
+  const issues: JiraIssue[] = []
+  let startAt = 0
+
+  while (issues.length < maxTotal) {
+    const params = new URLSearchParams({
+      jql,
+      startAt: String(startAt),
+      maxResults: '100',
+      fields: ISSUE_FIELDS.join(','),
+    })
+    const page = await jiraFetch<SearchResponse>(`/rest/agile/1.0/board/${boardId}/issue?${params}`)
+
+    issues.push(...page.issues)
+    startAt += page.issues.length
+    if (page.issues.length === 0 || startAt >= page.total) break
+    await sleep(250)
+  }
+
+  return issues
+}
+
 export function getIssue(key: string): Promise<JiraIssue> {
   return jiraFetch<JiraIssue>(`/rest/api/2/issue/${encodeURIComponent(key)}?fields=${ISSUE_FIELDS.join(',')}`)
 }

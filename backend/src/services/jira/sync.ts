@@ -2,7 +2,7 @@ import type { Prisma, User } from '@prisma/client'
 import { DEFAULT_JQL, env } from '../../env'
 import { addDaysToKey, keyToDbDate, todayKey } from '../../lib/dates'
 import { prisma } from '../../lib/prisma'
-import { JiraError, getIssue, getMyself, searchIssues, type JiraIssue } from './client'
+import { JiraError, getIssue, getMyself, searchBoardIssues, searchIssues, type JiraIssue } from './client'
 import { extractSprintIds, pickSprintId, resolveSprints, syncBoardSprints } from './sprint'
 import { syncWorklogs } from './worklogs'
 
@@ -27,6 +27,7 @@ function mapIssue(issue: JiraIssue) {
     status: f.status?.name ?? 'Unknown',
     statusCategory,
     issueType: f.issuetype?.name ?? 'Task',
+    isSubtask: f.issuetype?.subtask === true,
     projectKey: f.project?.key ?? issue.key.split('-')[0],
     projectName: f.project?.name ?? '',
     priority: f.priority?.name ?? null,
@@ -79,9 +80,14 @@ async function upsertIssues(issues: JiraIssue[]): Promise<number> {
   return count
 }
 
+/** Scoping to a board makes the panel show exactly what JIRA's board shows, backlog included. */
+function searchForUser(user: User, jql: string, maxTotal: number) {
+  return user.boardId ? searchBoardIssues(user.boardId, jql, maxTotal) : searchIssues(jql, maxTotal)
+}
+
 /** Sprint issues and anything touched in the last week — cheap enough to run every few minutes. */
 export async function syncHot(user: User): Promise<number> {
-  return upsertIssues(await searchIssues(buildJql(user, HOT_JQL), 300))
+  return upsertIssues(await searchForUser(user, buildJql(user, HOT_JQL), 300))
 }
 
 /**
@@ -112,7 +118,7 @@ export async function syncPlanned(user: User): Promise<number> {
 /** Full working set. Only this tier may flag issues as orphaned. */
 export async function syncFull(user: User): Promise<number> {
   const startedAt = new Date()
-  const count = await upsertIssues(await searchIssues(buildJql(user), 2000))
+  const count = await upsertIssues(await searchForUser(user, buildJql(user), 2000))
   await syncBoardSprints()
 
   if (count > 0) {
