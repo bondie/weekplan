@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { Coffee, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { Coffee, Plus, X } from 'lucide-react'
+import { useState, type KeyboardEvent } from 'react'
 import type { Day } from '../api/types'
 import { usePlanner } from '../hooks/planner'
 import { formatDayLabel, formatMinutes } from '../lib/format'
@@ -19,13 +19,21 @@ export default function DayColumn({ day }: { day: Day }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${day.date}`, data: { type: 'day', date: day.date } })
   const { weekday, day: dayLabel } = formatDayLabel(day.date)
 
-  const submitBlock = () => {
-    const minutes = parseMinutes(draft.duration)
-    if (draft.title.trim() && minutes) {
-      planner.addManualEvent({ date: day.date, title: draft.title.trim(), startTime: draft.startTime, minutes })
-    }
+  const cancelBlock = () => {
     setDraft({ title: '', startTime: '09:00', duration: '1' })
     setAdding(false)
+  }
+
+  const submitBlock = () => {
+    const minutes = parseMinutes(draft.duration)
+    if (!draft.title.trim() || !minutes) return
+    planner.addManualEvent({ date: day.date, title: draft.title.trim(), startTime: draft.startTime, minutes })
+    cancelBlock()
+  }
+
+  const onFormKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter') submitBlock()
+    if (event.key === 'Escape') cancelBlock()
   }
 
   return (
@@ -106,15 +114,23 @@ export default function DayColumn({ day }: { day: Day }) {
         ) : null}
 
         {adding ? (
-          <div className="space-y-1 rounded-md border border-amber-200 bg-amber-50 p-1.5">
-            <input
-              autoFocus
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-              onKeyDown={(event) => event.key === 'Enter' && submitBlock()}
-              placeholder="Název režie"
-              className="w-full rounded border border-amber-200 px-1.5 py-1 text-[11px] outline-none"
-            />
+          <div className="space-y-1 rounded-md border border-amber-200 bg-amber-50 p-1.5" onKeyDown={onFormKeyDown}>
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+                placeholder="Název režie"
+                className="w-full rounded border border-amber-200 px-1.5 py-1 text-[11px] outline-none"
+              />
+              <button
+                onClick={cancelBlock}
+                title="Zrušit (Esc)"
+                className="shrink-0 rounded p-0.5 text-amber-600/60 hover:bg-amber-100 hover:text-amber-800"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
             <div className="flex gap-1">
               <input
                 value={draft.startTime}
@@ -127,7 +143,11 @@ export default function DayColumn({ day }: { day: Day }) {
                 placeholder="1h"
                 className="w-14 rounded border border-amber-200 px-1.5 py-1 text-[11px] outline-none"
               />
-              <button onClick={submitBlock} className="flex-1 rounded bg-amber-500 text-[11px] font-medium text-white">
+              <button
+                onClick={submitBlock}
+                disabled={!draft.title.trim()}
+                className="flex-1 rounded bg-amber-500 text-[11px] font-medium text-white disabled:opacity-40"
+              >
                 Přidat
               </button>
             </div>
