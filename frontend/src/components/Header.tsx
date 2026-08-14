@@ -11,6 +11,7 @@ export default function Header({ onOpenSettings }: { onOpenSettings: () => void 
 
   const status = useQuery({ queryKey: ['sync'], queryFn: api.syncStatus, refetchInterval: 60_000 })
   const me = useQuery({ queryKey: ['me'], queryFn: api.me })
+  const workload = useQuery({ queryKey: ['workload'], queryFn: api.workload })
 
   const sync = useMutation({
     mutationFn: async () => {
@@ -76,6 +77,18 @@ export default function Header({ onOpenSettings }: { onOpenSettings: () => void 
             tone={totals.overbookedMinutes > 0 ? 'rose' : 'emerald'}
           />
         </div>
+      ) : null}
+
+      {workload.data ? (
+        <span
+          className="flex items-baseline gap-1 border-l border-slate-200 pl-4 text-sm"
+          title={`Ve sprintech ${formatMinutes(workload.data.sprintMinutes)}, v backlogu ${formatMinutes(
+            workload.data.backlogMinutes,
+          )} · ${workload.data.issueCount} tasků, z toho ${workload.data.withoutEstimateCount} bez odhadu`}
+        >
+          <span className="font-semibold text-slate-700">{formatMinutes(workload.data.remainingMinutes)}</span>
+          <span className="text-xs text-slate-400">zbývá vykázat celkem</span>
+        </span>
       ) : null}
 
       <div className="ml-auto flex items-center gap-3">

@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { classifySprints } from '../services/sprints'
 import { serializeIssue, sprintCoversWeek } from '../services/week'
 import { currentUser } from './context'
 
@@ -50,25 +51,7 @@ export async function issuesRoutes(app: FastifyInstance) {
     }
 
     const grouped = await prisma.issue.groupBy({ by: ['sprintId'], where: base, _count: { _all: true } })
-    const allSprints = await prisma.sprint.findMany()
-
-    /**
-     * Only the running sprint series is plannable: the active sprint and the dated sprints
-     * that follow it. Dumping-ground sprints are FUTURE too, but they carry no dates and
-     * their ids predate the active sprint — their issues belong to the backlog.
-     */
-    const activeIds = allSprints.filter((sprint) => sprint.state === 'ACTIVE').map((sprint) => sprint.id)
-    const firstActiveId = activeIds.length > 0 ? Math.min(...activeIds) : null
-    const isPlannable = (sprint: { id: number; state: string; startDate: Date | null }) =>
-      sprint.state === 'ACTIVE' ||
-      (sprint.state === 'FUTURE' && sprint.startDate !== null && (firstActiveId === null || sprint.id >= firstActiveId))
-
-    const plannable = allSprints.filter(isPlannable)
-    const plannableIds = new Set(plannable.map((sprint) => sprint.id))
-    // Closed sprints are history: not plannable and, like in JIRA, not part of the backlog.
-    const backlogSprintIds = allSprints
-      .filter((sprint) => !plannableIds.has(sprint.id) && sprint.state !== 'CLOSED')
-      .map((sprint) => sprint.id)
+    const { plannable, backlogSprintIds } = await classifySprints()
 
     const countBySprint = new Map(grouped.map((row) => [row.sprintId, row._count._all]))
 

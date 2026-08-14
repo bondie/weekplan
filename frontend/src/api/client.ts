@@ -1,4 +1,4 @@
-import type { CalendarSource, IssueList, Me, SyncStatus, Week } from './types'
+import type { CalendarSource, IssueList, Me, SyncStatus, Week, Workload } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -22,6 +22,8 @@ export const api = {
     request<Me>('/me', { method: 'PATCH', body: json(body) }),
 
   week: (from: string) => request<Week>(`/week?from=${from}`),
+
+  workload: () => request<Workload>('/workload'),
 
   issues: (
     week: string,

@@ -4,6 +4,7 @@ import { DEFAULT_JQL } from '../env'
 import { prisma } from '../lib/prisma'
 import { runCalendarSync } from '../services/calendar/sync'
 import { buildJql, runJiraSync } from '../services/jira/sync'
+import { classifySprints, remainingMinutes } from '../services/sprints'
 import { currentUser } from './context'
 
 const patchSchema = z.object({
@@ -56,6 +57,45 @@ export async function meRoutes(app: FastifyInstance) {
       workingDays: updated.workingDays,
       showWeekend: updated.showWeekend,
       jql: updated.jql,
+    }
+  })
+
+  /** Week-independent: how much work is waiting in JIRA overall. */
+  app.get('/api/workload', async (request) => {
+    const user = await currentUser(request)
+    const [hiddenRows, { plannableIds }] = await Promise.all([
+      prisma.hiddenIssue.findMany({ where: { userId: user.id }, select: { issueId: true } }),
+      classifySprints(),
+    ])
+
+    const hiddenIds = hiddenRows.map((row) => row.issueId)
+    const issues = await prisma.issue.findMany({
+      where: {
+        assigneeUsername: user.jiraUsername,
+        isResolved: false,
+        isOrphaned: false,
+        ...(hiddenIds.length > 0 ? { id: { notIn: hiddenIds } } : {}),
+      },
+      select: { remainingEstimateMin: true, originalEstimateMin: true, sprintId: true },
+    })
+
+    let sprintMinutes = 0
+    let backlogMinutes = 0
+    let withoutEstimate = 0
+
+    for (const issue of issues) {
+      const minutes = remainingMinutes(issue)
+      if (minutes === 0) withoutEstimate += 1
+      if (issue.sprintId !== null && plannableIds.has(issue.sprintId)) sprintMinutes += minutes
+      else backlogMinutes += minutes
+    }
+
+    return {
+      remainingMinutes: sprintMinutes + backlogMinutes,
+      sprintMinutes,
+      backlogMinutes,
+      issueCount: issues.length,
+      withoutEstimateCount: withoutEstimate,
     }
   })
 

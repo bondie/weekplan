@@ -3,7 +3,8 @@ const WEEKDAYS = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 export function formatMinutes(minutes: number): string {
   if (minutes === 0) return '0 h'
   const hours = minutes / 60
-  const rounded = Math.round(hours * 100) / 100
+  // Quarter-hour precision matters while planning a day; totals in the hundreds do not.
+  const rounded = hours >= 10 ? Math.round(hours) : Math.round(hours * 100) / 100
   return `${String(rounded).replace('.', ',')} h`
 }
 

@@ -132,6 +132,14 @@ export interface CalendarSource {
   eventCount: number
 }
 
+export interface Workload {
+  remainingMinutes: number
+  sprintMinutes: number
+  backlogMinutes: number
+  issueCount: number
+  withoutEstimateCount: number
+}
+
 export interface SyncStatus {
   jira: {
     ok: boolean
