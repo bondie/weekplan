@@ -78,7 +78,11 @@ jobs:
             echo "::error::vypadá to na natvrdo zapsané přihlašovací údaje"
             exit 1
           fi
-          if git grep -nIE 'https?://[a-z0-9.-]*jira[a-z0-9.-]*\.(cz|com|net)' -- . ':!*.example' ':!README.md'; then
+          # Placeholder hosts (jira.example.com) are documentation, not a leak.
+          hosts=$(git grep -nIE 'https?://[a-z0-9.-]*jira[a-z0-9.-]*\.(cz|com|net)' -- . ':!*.example' ':!README.md' \
+                  | grep -vE 'jira\.example\.' || true)
+          if [ -n "$hosts" ]; then
+            echo "$hosts"
             echo "::error::konkrétní JIRA instance patří jen do .env"
             exit 1
           fi
