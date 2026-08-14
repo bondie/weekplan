@@ -50,28 +50,38 @@ export async function issuesRoutes(app: FastifyInstance) {
     }
 
     const grouped = await prisma.issue.groupBy({ by: ['sprintId'], where: base, _count: { _all: true } })
-    const sprintRows = await prisma.sprint.findMany({
-      where: { id: { in: grouped.map((row) => row.sprintId).filter((id): id is number => id !== null) } },
-    })
+    const allSprints = await prisma.sprint.findMany()
 
-    const sprintById = new Map(sprintRows.map((sprint) => [sprint.id, sprint]))
-    // Closed sprints are not part of planning and, like in JIRA, not part of the backlog either.
-    const closedIds = sprintRows.filter((sprint) => sprint.state === 'CLOSED').map((sprint) => sprint.id)
+    /**
+     * Only the running sprint series is plannable: the active sprint and the dated sprints
+     * that follow it. Dumping-ground sprints are FUTURE too, but they carry no dates and
+     * their ids predate the active sprint — their issues belong to the backlog.
+     */
+    const activeIds = allSprints.filter((sprint) => sprint.state === 'ACTIVE').map((sprint) => sprint.id)
+    const firstActiveId = activeIds.length > 0 ? Math.min(...activeIds) : null
+    const isPlannable = (sprint: { id: number; state: string; startDate: Date | null }) =>
+      sprint.state === 'ACTIVE' ||
+      (sprint.state === 'FUTURE' && sprint.startDate !== null && (firstActiveId === null || sprint.id >= firstActiveId))
 
-    const options = grouped
-      .filter((row) => row.sprintId !== null && !closedIds.includes(row.sprintId))
-      .map((row) => {
-        const sprint = sprintById.get(row.sprintId!)
-        return {
-          id: row.sprintId!,
-          name: sprint?.name ?? `Sprint ${row.sprintId}`,
-          state: sprint?.state ?? 'UNKNOWN',
-          startDate: sprint?.startDate?.toISOString() ?? null,
-          endDate: sprint?.endDate?.toISOString() ?? null,
-          count: row._count._all,
-        }
-      })
-      // Dumping-ground sprints have no dates, so date-first ordering pushes them last.
+    const plannable = allSprints.filter(isPlannable)
+    const plannableIds = new Set(plannable.map((sprint) => sprint.id))
+    // Closed sprints are history: not plannable and, like in JIRA, not part of the backlog.
+    const backlogSprintIds = allSprints
+      .filter((sprint) => !plannableIds.has(sprint.id) && sprint.state !== 'CLOSED')
+      .map((sprint) => sprint.id)
+
+    const countBySprint = new Map(grouped.map((row) => [row.sprintId, row._count._all]))
+
+    const options = plannable
+      .filter((sprint) => (countBySprint.get(sprint.id) ?? 0) > 0 || (week ? sprintCoversWeek(sprint, week) : false))
+      .map((sprint) => ({
+        id: sprint.id,
+        name: sprint.name,
+        state: sprint.state,
+        startDate: sprint.startDate?.toISOString() ?? null,
+        endDate: sprint.endDate?.toISOString() ?? null,
+        count: countBySprint.get(sprint.id) ?? 0,
+      }))
       .sort(
         (a, b) =>
           (STATE_ORDER[a.state] ?? 4) - (STATE_ORDER[b.state] ?? 4) ||
@@ -79,24 +89,8 @@ export async function issuesRoutes(app: FastifyInstance) {
           a.id - b.id,
       )
 
-    // The sprint covering the week belongs in the picker even before anything is moved into it.
-    if (week) {
-      const upcoming = await prisma.sprint.findMany({ where: { state: { in: ['ACTIVE', 'FUTURE'] } } })
-      for (const sprint of upcoming) {
-        if (options.some((option) => option.id === sprint.id)) continue
-        if (!sprintCoversWeek(sprint, week)) continue
-        options.push({
-          id: sprint.id,
-          name: sprint.name,
-          state: sprint.state,
-          startDate: sprint.startDate?.toISOString() ?? null,
-          endDate: sprint.endDate?.toISOString() ?? null,
-          count: 0,
-        })
-      }
-    }
-
-    const noSprintCount = grouped.find((row) => row.sprintId === null)?._count._all ?? 0
+    const noSprintCount =
+      (countBySprint.get(null) ?? 0) + backlogSprintIds.reduce((sum, id) => sum + (countBySprint.get(id) ?? 0), 0)
 
     // Default view follows the week on screen: the sprint that covers it. Everything else
     // (dumping-ground sprints, closed sprints, backlog) is opt-in.
@@ -123,7 +117,9 @@ export async function issuesRoutes(app: FastifyInstance) {
 
     const sprintFilter: Prisma.IssueWhereInput[] = [
       ...(selectedIds.length > 0 ? [{ sprintId: { in: selectedIds } }] : []),
-      ...(includeNoSprint ? [{ sprintId: null }] : []),
+      ...(includeNoSprint
+        ? [{ sprintId: null }, ...(backlogSprintIds.length > 0 ? [{ sprintId: { in: backlogSprintIds } }] : [])]
+        : []),
     ]
 
     // Searching by name or key looks across every sprint — otherwise an issue would be
