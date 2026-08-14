@@ -20,6 +20,11 @@ jobs:
     env:
       # Prisma CLI resolves env() in the schema even when it never opens a connection.
       DATABASE_URL: postgresql://weekplan:weekplan@localhost:5432/weekplan
+      # Config is validated at import time, so the unit tests need something to import — the
+      # tests themselves never reach the network.
+      JIRA_URL: https://jira.example.com
+      JIRA_USERNAME: ci
+      JIRA_PASSWORD: ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
