@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { keyToDbDate, localDayStart, startOfIsoWeek } from '../lib/dates'
+import { keyToDbDate, localDayStart, startOfIsoWeek, todayKey } from '../lib/dates'
 import { prisma } from '../lib/prisma'
 import { syncCalendarSource } from '../services/calendar/sync'
 import { buildWeek } from '../services/week'
@@ -30,6 +30,16 @@ const manualEventSchema = z.object({
     .int()
     .min(15)
     .max(24 * 60),
+})
+
+const recurringSchema = z.object({
+  title: z.string().min(1).max(100),
+  minutes: z
+    .number()
+    .int()
+    .min(5)
+    .max(8 * 60),
+  weekdays: z.array(z.number().int().min(1).max(7)).optional(),
 })
 
 const eventPatchSchema = z.object({
@@ -177,6 +187,49 @@ export async function calendarRoutes(app: FastifyInstance) {
 
     await prisma.calendarEvent.delete({ where: { id } })
     return { week: await buildWeek(user.id, startOfIsoWeek(event.startsAt.toISOString().slice(0, 10))) }
+  })
+
+  app.get('/api/calendar/recurring', async (request) => {
+    const user = await currentUser(request)
+    return prisma.recurringOverhead.findMany({ where: { userId: user.id }, orderBy: { createdAt: 'asc' } })
+  })
+
+  app.post('/api/calendar/recurring', async (request, reply) => {
+    const user = await currentUser(request)
+    const body = recurringSchema.parse(request.body)
+
+    await prisma.recurringOverhead.create({
+      data: {
+        userId: user.id,
+        title: body.title,
+        minutes: body.minutes,
+        weekdays: body.weekdays ?? [1, 2, 3, 4, 5],
+      },
+    })
+
+    reply.code(201)
+    return { week: await buildWeek(user.id, startOfIsoWeek(todayKey())) }
+  })
+
+  app.patch('/api/calendar/recurring/:id', async (request) => {
+    const user = await currentUser(request)
+    const { id } = z.object({ id: z.string() }).parse(request.params)
+    const body = recurringSchema.partial().extend({ enabled: z.boolean().optional() }).parse(request.body)
+
+    await prisma.recurringOverhead.findFirstOrThrow({ where: { id, userId: user.id } })
+    await prisma.recurringOverhead.update({ where: { id }, data: body })
+
+    return { week: await buildWeek(user.id, startOfIsoWeek(todayKey())) }
+  })
+
+  app.delete('/api/calendar/recurring/:id', async (request) => {
+    const user = await currentUser(request)
+    const { id } = z.object({ id: z.string() }).parse(request.params)
+
+    await prisma.recurringOverhead.findFirstOrThrow({ where: { id, userId: user.id } })
+    await prisma.recurringOverhead.delete({ where: { id } })
+
+    return { week: await buildWeek(user.id, startOfIsoWeek(todayKey())) }
   })
 
   app.put('/api/days/:date/capacity', async (request) => {

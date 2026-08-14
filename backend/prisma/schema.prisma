@@ -31,6 +31,22 @@ model User {
   dayOverrides    DayOverride[]
   hiddenIssues    HiddenIssue[]
   worklogs        Worklog[]
+  recurringOverheads RecurringOverhead[]
+}
+
+/// Overhead that happens every day and never lands in the calendar — daily planning, standups.
+model RecurringOverhead {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  minutes   Int
+  weekdays  Int[]    @default([1, 2, 3, 4, 5]) // ISO weekday 1=Mon .. 7=Sun
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /// What was actually logged in JIRA (via Tempo), as opposed to what was planned.

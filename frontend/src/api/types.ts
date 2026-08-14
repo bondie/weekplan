@@ -25,13 +25,22 @@ export interface Issue {
 export interface CalendarEventItem {
   id: string
   title: string
-  startsAt: string
-  endsAt: string
+  startsAt: string | null
+  endsAt: string | null
   allDay: boolean
   busyStatus: string
   countsToCapacity: boolean
   manual: boolean
+  recurring: boolean
   minutes: number
+}
+
+export interface RecurringOverhead {
+  id: string
+  title: string
+  minutes: number
+  weekdays: number[]
+  enabled: boolean
 }
 
 export interface Assignment {

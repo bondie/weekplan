@@ -50,6 +50,8 @@ export async function issuesRoutes(app: FastifyInstance) {
       isSubtask: false,
       // Overhead is planned from the calendar, not by dragging its monthly task around.
       projectKey: { notIn: [...user.ignoredProjects, ...(user.overheadProject ? [user.overheadProject] : [])] },
+      // Estimate fully burnt = nothing left to schedule. Issues with no estimate still need planning.
+      AND: [{ OR: [{ remainingEstimateMin: { not: 0 } }, { remainingEstimateMin: null }] }],
       ...(hidden ? { id: { in: hiddenIds } } : excluded.length > 0 ? { id: { notIn: excluded } } : {}),
     }
 

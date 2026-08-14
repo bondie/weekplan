@@ -16,7 +16,10 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }) {
   })
 
   const [newSource, setNewSource] = useState({ name: 'Outlook / Teams', url: '' })
+  const [newRecurring, setNewRecurring] = useState({ title: '', minutes: 30 })
   const [jqlDraft, setJqlDraft] = useState<string | null>(null)
+
+  const recurring = useQuery({ queryKey: ['recurring'], queryFn: api.recurringOverheads })
 
   const refresh = () => {
     void queryClient.invalidateQueries()
@@ -31,6 +34,19 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }) {
     },
   })
   const removeSource = useMutation({ mutationFn: api.deleteSource, onSuccess: refresh })
+  const createRecurring = useMutation({
+    mutationFn: (input: { title: string; minutes: number }) => api.createRecurringOverhead(input),
+    onSuccess: () => {
+      setNewRecurring({ title: '', minutes: 30 })
+      refresh()
+    },
+  })
+  const updateRecurring = useMutation({
+    mutationFn: (input: { id: string; body: { weekdays?: number[]; enabled?: boolean } }) =>
+      api.updateRecurringOverhead(input.id, input.body),
+    onSuccess: refresh,
+  })
+  const deleteRecurring = useMutation({ mutationFn: api.deleteRecurringOverhead, onSuccess: refresh })
   const syncCalendar = useMutation({ mutationFn: api.syncCalendar, onSuccess: refresh })
   const fullSync = useMutation({ mutationFn: () => api.syncJira(true), onSuccess: refresh })
 
@@ -222,6 +238,81 @@ export default function SettingsDialog({ onClose }: { onClose: () => void }) {
               <RefreshCw className={`size-3.5 ${syncCalendar.isPending ? 'animate-spin' : ''}`} />
               Stáhnout kalendáře teď
             </button>
+          </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold text-slate-700">Pravidelná režie</h3>
+            <p className="mb-2 text-xs text-slate-500">
+              Režie, která se opakuje každý den a nikdy není v kalendáři — třeba denní plánování. Odečítá se z kapacity
+              vybraných dnů.
+            </p>
+
+            <div className="space-y-1">
+              {recurring.data?.map((item) => (
+                <div key={item.id} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2">
+                  <span className="text-sm text-slate-700">{item.title}</span>
+                  <span className="text-xs text-slate-400">{item.minutes} min</span>
+                  <div className="ml-auto flex gap-0.5">
+                    {WEEKDAYS.map((label, index) => {
+                      const day = index + 1
+                      const active = item.weekdays.includes(day)
+                      return (
+                        <button
+                          key={label}
+                          onClick={() =>
+                            updateRecurring.mutate({
+                              id: item.id,
+                              body: {
+                                weekdays: active
+                                  ? item.weekdays.filter((value) => value !== day)
+                                  : [...item.weekdays, day].sort(),
+                              },
+                            })
+                          }
+                          className={`w-7 rounded py-0.5 text-[11px] ${
+                            active ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button
+                    onClick={() => deleteRecurring.mutate(item.id)}
+                    className="rounded p-1 text-slate-300 hover:text-rose-600"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+              ))}
+              {recurring.data?.length === 0 ? <p className="text-xs text-slate-400">Zatím nic.</p> : null}
+            </div>
+
+            <div className="mt-2 flex gap-2">
+              <input
+                value={newRecurring.title}
+                onChange={(event) => setNewRecurring({ ...newRecurring, title: event.target.value })}
+                placeholder="Např. Denní plánování"
+                className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400"
+              />
+              <input
+                type="number"
+                min="5"
+                step="5"
+                value={newRecurring.minutes}
+                onChange={(event) => setNewRecurring({ ...newRecurring, minutes: Number(event.target.value) })}
+                className="w-20 rounded-md border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400"
+              />
+              <span className="self-center text-xs text-slate-400">min</span>
+              <button
+                onClick={() => createRecurring.mutate(newRecurring)}
+                disabled={!newRecurring.title || createRecurring.isPending}
+                className="rounded-md bg-amber-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+              >
+                Přidat
+              </button>
+            </div>
           </section>
 
           <section>

@@ -107,6 +107,9 @@ PAT tokeny přišly až v 8.14, takže heslo je jediná možnost. Konfigurace je
 - Outlook publikuje ICS se zpožděním klidně hodin — proto stáří feedu v UI a ruční bloky režie
   (`CalendarEvent.manual = true`, `sourceId = null`).
 - Změna URL zdroje maže `contentHash`, jinak by se nový feed vyhodnotil jako „beze změny".
+- `RecurringOverhead` je režie, která se opakuje a v kalendáři nikdy není (denní plánování, standup).
+  Nemá čas, jen délku — proto se přičítá **až po** sloučení kalendářových intervalů, aby se
+  nepodílela na jejich překryvech. Do dnů se vykresluje jako virtuální blok (`recurring: true`).
 
 ## Datumy a kapacita
 

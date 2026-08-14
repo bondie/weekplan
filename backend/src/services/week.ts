@@ -1,4 +1,4 @@
-import type { CalendarEvent, DayOverride, Issue, Sprint, User, Worklog } from '@prisma/client'
+import type { CalendarEvent, DayOverride, Issue, RecurringOverhead, Sprint, User, Worklog } from '@prisma/client'
 import {
   addDaysToKey,
   dbDateToKey,
@@ -76,12 +76,13 @@ export interface SprintPayload {
 export interface EventPayload {
   id: string
   title: string
-  startsAt: string
-  endsAt: string
+  startsAt: string | null
+  endsAt: string | null
   allDay: boolean
   busyStatus: string
   countsToCapacity: boolean
   manual: boolean
+  recurring: boolean
   minutes: number
 }
 
@@ -165,6 +166,7 @@ function buildDay(
   assignments: Array<{ assignment: AssignmentPayload }>,
   override: DayOverride | undefined,
   worklogs: Worklog[],
+  recurring: RecurringOverhead[],
 ): DayPayload {
   const dayStart = localDayStart(key)
   const dayEnd = localDayEnd(key)
@@ -191,11 +193,15 @@ function buildDay(
     ])
     .filter(([start, end]) => end > start)
 
-  const overheadRawMinutes = Math.round(
-    mergeIntervals(busyIntervals).reduce((sum, [start, end]) => sum + (end - start), 0) / 60000,
-  )
-
   const baseCapacity = dayCapacity(user, key, override, holiday)
+
+  // Recurring overhead has no clock time, so it is added after the calendar intervals are merged.
+  const dayRecurring = baseCapacity > 0 ? recurring.filter((item) => item.weekdays.includes(isoWeekday(key))) : []
+  const recurringMinutes = dayRecurring.reduce((sum, item) => sum + item.minutes, 0)
+
+  const overheadRawMinutes =
+    Math.round(mergeIntervals(busyIntervals).reduce((sum, [start, end]) => sum + (end - start), 0) / 60000) +
+    recurringMinutes
   const capacityMinutes = blockedAllDay ? 0 : baseCapacity
   const overheadMinutes = Math.min(capacityMinutes, overheadRawMinutes)
   const availableMinutes = Math.max(0, capacityMinutes - overheadMinutes)
@@ -216,19 +222,34 @@ function buildDay(
     overbookedMinutes: Math.max(0, plannedMinutes - availableMinutes),
     blockedAllDay,
     override: override ? { capacityMinutes: override.capacityMinutes, note: override.note } : null,
-    events: dayEvents
-      .map((event) => ({
-        id: event.id,
-        title: event.title,
-        startsAt: event.startsAt.toISOString(),
-        endsAt: event.endsAt.toISOString(),
-        allDay: event.allDay,
-        busyStatus: event.busyStatus,
-        countsToCapacity: event.countsToCapacity,
-        manual: event.manual,
-        minutes: event.allDay ? 0 : overlapMinutes(event.startsAt, event.endsAt, dayStart, dayEnd),
-      }))
-      .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.startsAt.localeCompare(b.startsAt)),
+    events: [
+      ...dayEvents
+        .map((event) => ({
+          id: event.id,
+          title: event.title,
+          startsAt: event.startsAt.toISOString(),
+          endsAt: event.endsAt.toISOString(),
+          allDay: event.allDay,
+          busyStatus: event.busyStatus,
+          countsToCapacity: event.countsToCapacity,
+          manual: event.manual,
+          recurring: false,
+          minutes: event.allDay ? 0 : overlapMinutes(event.startsAt, event.endsAt, dayStart, dayEnd),
+        }))
+        .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.startsAt.localeCompare(b.startsAt)),
+      ...dayRecurring.map((item) => ({
+        id: `recurring:${item.id}`,
+        title: item.title,
+        startsAt: null,
+        endsAt: null,
+        allDay: false,
+        busyStatus: 'BUSY',
+        countsToCapacity: true,
+        manual: false,
+        recurring: true,
+        minutes: item.minutes,
+      })),
+    ],
     assignments: assignments.map((item) => item.assignment).sort((a, b) => a.position - b.position),
     loggedMinutes: worklogs.reduce((sum, worklog) => sum + worklog.minutes, 0),
     loggedOverheadMinutes: worklogs
@@ -277,7 +298,7 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
   const keys = Array.from({ length: 7 }, (_, index) => addDaysToKey(weekStart, index))
   const weekEnd = keys[6]
 
-  const [assignments, events, overrides, activeSprints, worklogs] = await Promise.all([
+  const [assignments, events, overrides, activeSprints, worklogs, recurring] = await Promise.all([
     prisma.assignment.findMany({
       where: { userId, date: { gte: keyToDbDate(weekStart), lte: keyToDbDate(weekEnd) } },
       include: { issue: { include: { sprint: true } } },
@@ -302,6 +323,7 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
     prisma.worklog.findMany({
       where: { userId, date: { gte: keyToDbDate(weekStart), lte: keyToDbDate(weekEnd) } },
     }),
+    prisma.recurringOverhead.findMany({ where: { userId, enabled: true }, orderBy: { createdAt: 'asc' } }),
   ])
 
   const plannedByIssue = new Map<string, number>()
@@ -339,7 +361,7 @@ export async function buildWeek(userId: string, from: DateKey): Promise<WeekPayl
   }
 
   const days = keys.map((key) =>
-    buildDay(user, key, events, byDay.get(key) ?? [], overrideByDay.get(key), worklogsByDay.get(key) ?? []),
+    buildDay(user, key, events, byDay.get(key) ?? [], overrideByDay.get(key), worklogsByDay.get(key) ?? [], recurring),
   )
   const { week, year } = isoWeekNumber(weekStart)
 

@@ -1,4 +1,4 @@
-import type { CalendarSource, IssueList, Me, SyncStatus, Week, Workload } from './types'
+import type { CalendarSource, IssueList, Me, RecurringOverhead, SyncStatus, Week, Workload } from './types'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -80,6 +80,13 @@ export const api = {
   updateEvent: (id: string, body: { countsToCapacity?: boolean; minutes?: number; title?: string }) =>
     request<{ week: Week }>(`/calendar/events/${id}`, { method: 'PATCH', body: json(body) }),
   deleteEvent: (id: string) => request<{ week: Week }>(`/calendar/events/${id}`, { method: 'DELETE' }),
+
+  recurringOverheads: () => request<RecurringOverhead[]>('/calendar/recurring'),
+  createRecurringOverhead: (body: { title: string; minutes: number; weekdays?: number[] }) =>
+    request<{ week: Week }>('/calendar/recurring', { method: 'POST', body: json(body) }),
+  updateRecurringOverhead: (id: string, body: Partial<Omit<RecurringOverhead, 'id'>>) =>
+    request<{ week: Week }>(`/calendar/recurring/${id}`, { method: 'PATCH', body: json(body) }),
+  deleteRecurringOverhead: (id: string) => request<{ week: Week }>(`/calendar/recurring/${id}`, { method: 'DELETE' }),
 
   setDayCapacity: (date: string, body: { capacityMinutes: number; note?: string | null }) =>
     request<{ week: Week }>(`/days/${date}/capacity`, { method: 'PUT', body: json(body) }),
