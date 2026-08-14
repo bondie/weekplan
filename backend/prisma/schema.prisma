@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String   @id @default(cuid())
+  jiraKey              String   @unique // stable across account renames, unlike jiraUsername
+  jiraUsername         String   @unique
+  displayName          String
+  email                String?
+  dailyCapacityMinutes Int      @default(480)
+  workingDays          Int[]    @default([1, 2, 3, 4, 5]) // ISO weekday 1=Mon .. 7=Sun
+  timezone             String   @default("Europe/Prague")
+  jql                  String? // overrides the default query; {user} expands to jiraUsername
+  showWeekend          Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  assignments     Assignment[]
+  calendarSources CalendarSource[]
+  calendarEvents  CalendarEvent[]
+  dayOverrides    DayOverride[]
+}
+
+/// Read-only cache of JIRA issues; this app never writes to JIRA.
+model Issue {
+  id                   String    @id @default(cuid())
+  jiraId               String    @unique // upsert key: `key` changes when an issue moves project
+  key                  String    @unique
+  summary              String
+  status               String
+  statusCategory       String // new | indeterminate | done
+  issueType            String
+  projectKey           String
+  projectName          String
+  priority             String?
+  assigneeUsername     String?
+  assigneeName         String?
+  originalEstimateMin  Int?
+  remainingEstimateMin Int?
+  timeSpentMin         Int?
+  storyPoints          Float?
+  sprintId             Int?
+  rank                 String?
+  dueDate              DateTime? @db.Date
+  isResolved           Boolean   @default(false)
+  labels               String[]  @default([])
+  url                  String
+  jiraUpdatedAt        DateTime?
+  lastSeenAt           DateTime  @default(now())
+  syncedAt             DateTime  @default(now())
+  isOrphaned           Boolean   @default(false) // dropped out of the sync query (reassigned, deleted)
+
+  sprint      Sprint?      @relation(fields: [sprintId], references: [id])
+  assignments Assignment[]
+
+  @@index([assigneeUsername, isResolved])
+  @@index([sprintId])
+  @@index([projectKey])
+  @@index([rank])
+}
+
+model Sprint {
+  id            Int       @id
+  name          String
+  state         String // ACTIVE | FUTURE | CLOSED
+  startDate     DateTime?
+  endDate       DateTime?
+  completeDate  DateTime?
+  originBoardId Int?
+  fetchedAt     DateTime  @default(now())
+
+  issues Issue[]
+
+  @@index([state])
+}
+
+/// The plan itself: one row per (issue, day), so an issue can be split across days.
+model Assignment {
+  id               String   @id @default(cuid())
+  userId           String
+  issueId          String
+  issueKeySnapshot String // survives project moves, so the plan never loses its label
+  date             DateTime @db.Date
+  plannedMinutes   Int
+  position         Int      @default(0)
+  note             String?
+  done             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issue Issue @relation(fields: [issueId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, issueId, date]) // dropping the same issue twice on a day merges instead of duplicating
+  @@index([userId, date])
+  @@index([issueId])
+}
+
+model CalendarSource {
+  id                  String    @id @default(cuid())
+  userId              String
+  kind                String    @default("ICS_URL") // ICS_URL | MANUAL | MS_GRAPH
+  name                String
+  url                 String?
+  enabled             Boolean   @default(true)
+  allDayPolicy        String    @default("SMART") // SMART | IGNORE | FULL_DAY
+  countTentative      Boolean   @default(true)
+  etag                String?
+  lastModified        String?
+  contentHash         String?
+  lastFetchedAt       DateTime?
+  lastSuccessAt       DateTime?
+  lastError           String?
+  consecutiveFailures Int       @default(0)
+  eventCount          Int       @default(0)
+  createdAt           DateTime  @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events CalendarEvent[]
+
+  @@index([userId, enabled])
+}
+
+/// Overhead blocks: already-expanded ICS occurrences, or manually entered blocks.
+model CalendarEvent {
+  id               String   @id @default(cuid())
+  userId           String
+  sourceId         String?
+  uid              String
+  recurrenceId     String   @default("") // empty for single events, ISO instant per recurring instance
+  title            String
+  location         String?
+  startsAt         DateTime
+  endsAt           DateTime
+  localDate        DateTime @db.Date
+  allDay           Boolean  @default(false)
+  busyStatus       String   @default("BUSY") // FREE | TENTATIVE | BUSY | OOF | WORKING_ELSEWHERE
+  cancelled        Boolean  @default(false)
+  countsToCapacity Boolean  @default(true)
+  overrideMinutes  Int?
+  manual           Boolean  @default(false)
+  syncedAt         DateTime @default(now())
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source CalendarSource? @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, uid, recurrenceId])
+  @@index([userId, localDate])
+}
+
+model DayOverride {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime @db.Date
+  capacityMinutes Int
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model SyncState {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,6 @@
+node_modules
+dist
+backend/prisma/migrations
+*.prisma
+package-lock.json
+*.ics

@@ -1,0 +1,83 @@
+name: weekplan
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: weekplan
+      POSTGRES_PASSWORD: weekplan
+      POSTGRES_DB: weekplan
+      TZ: Europe/Prague
+    ports:
+      - '127.0.0.1:5442:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U weekplan -d weekplan']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://weekplan:weekplan@db:5432/weekplan
+      PORT: '3010'
+      TZ: Europe/Prague
+      NODE_ENV: development
+      JIRA_URL: ${JIRA_URL:?set JIRA_URL in .env or export it}
+      JIRA_USERNAME: ${JIRA_USERNAME:?set JIRA_USERNAME in .env or export it}
+      JIRA_PASSWORD: ${JIRA_PASSWORD:?set JIRA_PASSWORD in .env or export it}
+      JIRA_SYNC_CRON: ${JIRA_SYNC_CRON:-*/5 * * * *}
+      JIRA_FULL_SYNC_CRON: ${JIRA_FULL_SYNC_CRON:-7 */6 * * *}
+      CALENDAR_SYNC_CRON: ${CALENDAR_SYNC_CRON:-*/30 * * * *}
+      ICS_URL: ${ICS_URL:-}
+    ports:
+      - '127.0.0.1:3010:3010'
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prisma:/app/prisma
+    command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3010/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+
+  web:
+    build: ./frontend
+    environment:
+      TZ: Europe/Prague
+      PROXY_PORT: ${PROXY_PORT:-8090}
+    ports:
+      - '127.0.0.1:5180:5180'
+    depends_on:
+      - api
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+
+  proxy:
+    image: nginx:1.27-alpine
+    ports:
+      - '127.0.0.1:${PROXY_PORT:-8090}:80'
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - api
+
+volumes:
+  pgdata:
